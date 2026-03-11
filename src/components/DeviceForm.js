@@ -35,7 +35,7 @@ export default function DeviceForm({ deviceId, heartRate, onDeviceIdChange, onHe
           <input
             type="number"
             value={heartRate}
-            onChange={(e) => onHeartRateChange(Number(e.target.value))}
+            onChange={(e) => onHeartRateChange(e.target.value === '' ? '' : Number(e.target.value))}
             className="w-full rounded-lg bg-gray-800/60 border border-gray-700/50 px-3.5 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/40 transition-all"
             placeholder="e.g. 75"
           />

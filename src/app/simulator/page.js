@@ -12,11 +12,18 @@ export default function SimulatorPage() {
   const [loading, setLoading] = useState(false);
   const [attackLog, setAttackLog] = useState([]);
 
+  // Send Normal Data
+  // To avoid looking like a frozen device, we add a tiny bit of natural variance (+/- 2 bpm)
+  // This simulates a real patient's fluctuating heart rate and passes the Anomaly Check cleanly.
   async function handleSendNormal() {
     setLoading(true);
     setAttackLog([]);
     try {
-      const data = await sendDeviceData(deviceId, heartRate);
+      // Natural variance between -2 and +2 from base
+      const variance = Math.floor(Math.random() * 5) - 2; 
+      const realisticHR = Number(heartRate) + variance;
+      
+      const data = await sendDeviceData(deviceId, realisticHR);
       setResponse(data);
     } catch {
       setResponse({ status: "ERROR", message: "Could not reach backend" });
@@ -24,10 +31,24 @@ export default function SimulatorPage() {
     setLoading(false);
   }
 
+  // Send Fake / Spoofed Data (Layer 2 & Layer 3 Tester)
+  // This either sends an impossible physiological value (triggers Layer 2: Range Validator)
+  // OR it sends a value just outside the moving average (triggers Layer 3: Anomaly Detection)
   async function handleSendFake() {
     setLoading(true);
     setAttackLog([]);
-    const fakeValues = [-20, 0, 400, 500, 999];
+    
+    // Mix of impossible values (spoofing) and abnormal spikes (tampering)
+    const fakeValues = [
+      -10,        // Impossible low
+      0,          // Flatline (medical emergency, often spoofed)
+      18,         // Below 30 (Impossible human resting rate)
+      250,        // Above 220 (Impossible high)
+      999,        // Glitch / Data Injection
+      Number(heartRate) + 60, // Spike to trigger Layer 3 (Anomaly) without triggering Layer 2
+      Number(heartRate) - 50  // Drop to trigger Layer 3 (Anomaly) without triggering Layer 2
+    ];
+    
     const fakeHR = fakeValues[Math.floor(Math.random() * fakeValues.length)];
     try {
       const data = await sendDeviceData(deviceId, fakeHR);
@@ -38,16 +59,22 @@ export default function SimulatorPage() {
     setLoading(false);
   }
 
+  // Simulate DoS Attack (Layer 1 Tester)
+  // Sends a rapid burst of requests to trigger the Rate Limiter
   async function handleAttack() {
     setLoading(true);
     setResponse(null);
     setAttackLog([]);
     try {
+      // API lib fires 50 requests concurrently without waiting.
       const results = await simulateAttack(deviceId, 50);
       setAttackLog(results);
+      
+      const blockedCount = results.filter((r) => r.status === "BLOCKED").length;
+      
       setResponse({
         status: "ATTACK_COMPLETE",
-        message: `Sent 50 requests — ${results.filter((r) => r.status === "BLOCKED").length} blocked by the system.`,
+        message: `Sent 50 rapid requests in parallel. The Rate Limiter successfully blocked ${blockedCount} requests.`,
       });
     } catch {
       setResponse({ status: "ERROR", message: "Attack simulation failed" });
@@ -86,37 +113,37 @@ export default function SimulatorPage() {
             <button
               onClick={handleSendNormal}
               disabled={loading}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium hover:bg-emerald-500/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-sm font-medium hover:bg-sky-500/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="flex-1 text-left">Send Normal Data</span>
-              <span className="text-[10px] text-emerald-500/60">Valid BPM</span>
+              <span className="text-[10px] text-sky-500/60">Valid BPM (Simulate Pattern)</span>
             </button>
 
             <button
               onClick={handleSendFake}
               disabled={loading}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium hover:bg-amber-500/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-sm font-medium hover:bg-amber-500/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <span className="flex-1 text-left">Send Fake Medical Data</span>
-              <span className="text-[10px] text-amber-500/60">Invalid BPM</span>
+              <span className="text-[10px] text-amber-500/60">Spoofing / Injection Attack</span>
             </button>
 
             <button
               onClick={handleAttack}
               disabled={loading}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium hover:bg-red-500/15 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="flex-1 text-left">Simulate DoS Attack</span>
-              <span className="text-[10px] text-red-500/60">50 requests</span>
+              <span className="flex-1 text-left">Simulate DoS Burst</span>
+              <span className="text-[10px] text-red-500/60">50 rapid requests (Flood)</span>
             </button>
           </div>
 
@@ -162,13 +189,13 @@ export default function SimulatorPage() {
         <div className="rounded-xl border border-gray-800/60 bg-gray-900/50 p-5">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-1.5 rounded-lg bg-red-500/10">
-              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">Attack Log</h3>
-              <p className="text-[10px] text-gray-500">{attackLog.length} requests sent</p>
+              <h3 className="text-sm font-semibold text-white">Attack Log Statistics</h3>
+              <p className="text-[10px] text-gray-500">{attackLog.length} requests sent concurrently</p>
             </div>
           </div>
 
@@ -179,6 +206,7 @@ export default function SimulatorPage() {
                   <th className="px-3 py-2 w-12">#</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Details</th>
+                  <th className="px-3 py-2">Reason</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,8 +216,11 @@ export default function SimulatorPage() {
                     <td className="px-3 py-1.5">
                       <StatusBadge status={entry.status || "ERROR"} />
                     </td>
-                    <td className="px-3 py-1.5 text-gray-500 truncate max-w-[200px]">
-                      {entry.message || entry.error || "—"}
+                    <td className="px-3 py-1.5 text-gray-500">
+                      Sent {entry.heartRate || entry.sentValue || 'Random'} bpm
+                    </td>
+                    <td className="px-3 py-1.5 text-gray-400 truncate max-w-[200px]">
+                      {entry.reason || entry.message || entry.error || "—"}
                     </td>
                   </tr>
                 ))}
