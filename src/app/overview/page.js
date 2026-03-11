@@ -3,6 +3,17 @@
 import { useEffect, useState } from "react";
 import { fetchStats } from "@/lib/api";
 import StatCard from "@/components/StatCard";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Legend
+} from 'recharts';
 
 export default function OverviewPage() {
   const [stats, setStats] = useState(null);
@@ -20,7 +31,7 @@ export default function OverviewPage() {
 
   useEffect(() => {
     loadStats();
-    const interval = setInterval(loadStats, 5000);
+    const interval = setInterval(loadStats, 3000); // Poll a bit faster for the chart
     return () => clearInterval(interval);
   }, []);
 
@@ -58,6 +69,66 @@ export default function OverviewPage() {
         <StatCard label="Normal" value={stats.normal ?? 0} type="normal" />
         <StatCard label="Blocked" value={stats.blocked ?? 0} type="blocked" />
         <StatCard label="Suspicious" value={stats.suspicious ?? 0} type="suspicious" />
+      </div>
+
+      {/* Analytics Chart */}
+      <div className="rounded-xl border border-gray-800/60 bg-gray-900/50 p-5">
+        <h3 className="text-sm font-semibold text-white mb-4">Real-Time Telemetry & Threat Analysis</h3>
+        <div className="h-72 w-full">
+          {stats.chartData && stats.chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                <XAxis 
+                  dataKey="time" 
+                  stroke="#9CA3AF" 
+                  fontSize={11} 
+                  tickMargin={10} 
+                  minTickGap={20}
+                />
+                <YAxis 
+                  stroke="#9CA3AF" 
+                  fontSize={11}
+                  domain={[0, 300]} 
+                  label={{ value: 'Heart Rate (bpm)', angle: -90, position: 'insideLeft', style: { fill: '#9CA3AF', fontSize: 11 } }}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px' }}
+                  itemStyle={{ fontSize: '12px' }}
+                  labelStyle={{ color: '#9CA3AF', fontSize: '12px', marginBottom: '4px' }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', pt: '10px' }} />
+                
+                {/* Medical Safety Bounds (30-220 bpm) */}
+                <ReferenceLine y={220} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'top', value: 'Max Boundary (220)', fill: '#EF4444', fontSize: 10 }} />
+                <ReferenceLine y={30} stroke="#EF4444" strokeDasharray="3 3" label={{ position: 'bottom', value: 'Min Boundary (30)', fill: '#EF4444', fontSize: 10 }} />
+
+                <Line 
+                  type="monotone" 
+                  dataKey="heartRate" 
+                  name="Detected Value"
+                  stroke="#38BDF8" 
+                  strokeWidth={2}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    let fill = "#38BDF8"; // Normal
+                    if (payload.decision === "BLOCKED") fill = "#EF4444"; // Blocked (red)
+                    if (payload.decision === "FLAGGED") fill = "#F59E0B"; // Flagged (amber)
+                    
+                    return (
+                      <circle cx={cx} cy={cy} r={4} fill={fill} stroke={fill} key={`dot-${cx}-${cy}`} />
+                    );
+                  }}
+                  activeDot={{ r: 6 }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-xs text-gray-500">
+              Awaiting device telemetry data...
+            </div>
+          )}
+        </div>
       </div>
 
       {/* How It Works */}
@@ -103,9 +174,9 @@ export default function OverviewPage() {
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-gray-500">
         <span className="font-medium text-gray-400">Status Legend:</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Normal — valid data</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" /> Flagged — suspicious</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" /> Blocked — threat detected</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-400" /> Normal — valid data</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Flagged — suspicious</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /> Blocked — threat detected</span>
       </div>
     </div>
   );
