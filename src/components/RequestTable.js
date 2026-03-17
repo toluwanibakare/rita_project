@@ -49,6 +49,7 @@ export default function RequestTable({ logs, loading }) {
               <th className="px-5 py-3 sticky top-0 bg-gray-900/80">Heart Rate</th>
               <th className="px-5 py-3 sticky top-0 bg-gray-900/80">Timestamp</th>
               <th className="px-5 py-3 sticky top-0 bg-gray-900/80">Decision</th>
+              <th className="px-5 py-3 sticky top-0 bg-gray-900/80">Diagnostics Stage</th>
               <th className="px-5 py-3 sticky top-0 bg-gray-900/80">Reason</th>
             </tr>
           </thead>
@@ -62,11 +63,11 @@ export default function RequestTable({ logs, loading }) {
               >
                 <td className="px-5 py-3">
                   <span className="font-mono text-xs text-cyan-400 bg-cyan-500/5 px-2 py-0.5 rounded">
-                    {log.device_id}
+                    {log.deviceId}
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  <span className="font-mono text-gray-300">{log.heart_rate}</span>
+                  <span className="font-mono text-gray-300">{log.heartRate}</span>
                   <span className="text-gray-600 text-xs ml-1">BPM</span>
                 </td>
                 <td className="px-5 py-3 text-gray-500 text-xs">
@@ -74,6 +75,9 @@ export default function RequestTable({ logs, loading }) {
                 </td>
                 <td className="px-5 py-3">
                   <StatusBadge status={log.status || log.decision} />
+                </td>
+                <td className="px-5 py-3 text-gray-400 text-xs">
+                  {log.stage || "—"}
                 </td>
                 <td className="px-5 py-3 text-gray-500 text-xs max-w-[200px] truncate">
                   {log.reason || "—"}

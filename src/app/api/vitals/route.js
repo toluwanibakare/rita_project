@@ -19,7 +19,7 @@ export async function POST(request) {
   try {
     // 1. Parse the incoming JSON payload
     const body = await request.json();
-    const { deviceId, heartRate, timestamp } = body;
+    const { deviceId, heartRate, timestamp, gatewayId } = body;
 
     // Validate that the required fields are present and of the correct type
     if (!deviceId || typeof heartRate !== 'number' || !timestamp) {
@@ -30,11 +30,10 @@ export async function POST(request) {
     }
 
     // 2. Setup Device State
-    // If we haven't seen this device before, initialize its state in our in-memory store.
     if (!store.deviceStates[deviceId]) {
       store.deviceStates[deviceId] = {
-        lastRequestTime: null, // Tracks when the last request was made (for rate limiting)
-        history: []            // Stores the last 5 valid heart rate readings (for anomaly detection)
+        lastRequestTime: null,
+        history: []
       };
     }
 
@@ -49,75 +48,90 @@ export async function POST(request) {
      * Processes the final outcome of the request, updates the device's last request time,
      * logs the event, and returns the strictly formatted JSON response.
      */
-    const resolveRequest = (status, reason) => {
-      // Always update the last request time for this device, even if blocked
+    const resolveRequest = (status, reason, stage, reachedHospital) => {
       deviceState.lastRequestTime = now;
 
-      // Log the request and decision in our in-memory array for the frontend /api/logs endpoint
-      store.logs.unshift({
+      const logEntry = {
         deviceId,
         heartRate,
-        decision: status, // Example: "NORMAL", "BLOCKED", or "FLAGGED"
+        decision: status, 
         reason,
-        timestamp: new Date().toISOString() // Server-side time of processing
-      });
+        timestamp: new Date().toISOString(),
+        stage, 
+        reachedHospitalServer: reachedHospital,
+        gatewayId: gatewayId || 'GW-EDGE-01',
+        requestOrigin: `192.168.1.${Math.floor(Math.random() * 254) + 1}`
+      };
 
-      // Send the response back to the client/device
+      store.logs.unshift(logEntry);
+
       return NextResponse.json({
-        status,       // "NORMAL", "BLOCKED", "FLAGGED"
-        reason,       // Explanation of the status
-        deviceId,     // Echoed from request
-        heartRate,    // Echoed from request
-        timestamp     // Echoed from request
+        status,
+        reason,
+        deviceId,
+        heartRate,
+        timestamp,
+        stage,
+        reachedHospitalServer: reachedHospital
       });
     };
 
     // ==========================================
+    // LAYER 0: IDENTITY & ACCESS MANAGEMENT (IAM)
+    // ==========================================
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer iomt_secure_')) {
+      return resolveRequest('BLOCKED', 'Unauthorized: Invalid or missing device authorization token', 'Authentication', false);
+    }
+
+    // ==========================================
+    // LAYER 0.5: REPLAY ATTACK PREVENTION
+    // ==========================================
+    const clientTime = new Date(timestamp).getTime();
+    const timeDrift = Math.abs(Date.now() - clientTime);
+    if (timeDrift > 300000) { // 5 minutes window
+      return resolveRequest('BLOCKED', 'Anti-Replay Trigger: Data timestamp is too far in the past/future', 'Timestamp Validation', false);
+    }
+
+    // ==========================================
     // LAYER 1: RATE LIMITING (DoS Mitigation)
     // ==========================================
-    // If the device sends another request in less than 800 milliseconds, block it.
     if (timeSinceLast < 800) {
-      return resolveRequest('BLOCKED', 'Rate limit exceeded');
+      return resolveRequest('BLOCKED', 'Rate limit exceeded: requests arriving too frequently', 'Rate Limiting', false);
     }
 
     // ==========================================
     // LAYER 2: MEDICAL RANGE VALIDATION (Spoofing)
     // ==========================================
-    // Valid human heart rates are generally assumed to be between 30 and 220 bpm.
     if (heartRate < 30 || heartRate > 220) {
-      return resolveRequest('BLOCKED', 'Invalid physiological value');
+      return resolveRequest('BLOCKED', 'Invalid physiological value: outside human survival range (30-220 bpm)', 'Medical Range Validation', false);
     }
 
     // ==========================================
-    // LAYER 3: ANOMALY DETECTION (Tampering/Data integrity)
+    // LAYER 3: ANOMALY DETECTION (Tampering)
     // ==========================================
     let outcomeStatus = 'NORMAL';
     let outcomeReason = 'Processed successfully';
 
-    // If we have enough history to compare against...
     if (deviceState.history.length > 0) {
-      // Calculate the moving average of the last few heart rate values
       const sum = deviceState.history.reduce((a, b) => a + b, 0);
       const average = sum / deviceState.history.length;
       
-      // If the new heart rate deviates by more than 40 bpm from the device's usual average,
-      // it might be a spoofed value or clinical anomaly.
       if (Math.abs(heartRate - average) > 40) {
         outcomeStatus = 'FLAGGED';
-        outcomeReason = 'Suspicious pattern detected: excessive deviation from historical average';
+        outcomeReason = 'Suspicious pattern: excessive deviation from historical average';
       }
     }
 
-    // Only add VALID readings to the history (we do this after checking boundaries)
     deviceState.history.push(heartRate);
-    
-    // Keep only the last 5 readings to act as a lightweight moving window
     if (deviceState.history.length > 5) {
-      deviceState.history.shift(); // Remove the oldest reading
+      deviceState.history.shift();
     }
 
-    // If it passed all layers, or just triggered a flag, return the final result
-    return resolveRequest(outcomeStatus, outcomeReason);
+    const reachedHospital = true;
+    const finalStage = outcomeStatus === 'NORMAL' ? 'Hospital Server' : 'Anomaly Detection';
+
+    return resolveRequest(outcomeStatus, outcomeReason, finalStage, reachedHospital);
     
   } catch (error) {
     // Catch-all for any unexpected errors (e.g., malformed JSON)
