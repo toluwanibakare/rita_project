@@ -23,39 +23,39 @@ const iconMap = {
 
 const styles = {
   total: {
-    icon: "bg-cyan-500/10 text-cyan-400",
-    border: "border-cyan-500/10",
-    value: "text-cyan-400",
-    glow: "from-cyan-500/5",
+    icon: "bg-sky-100 text-sky-700",
+    border: "border-sky-200",
+    value: "text-sky-700",
+    glow: "from-sky-100",
   },
   normal: {
-    icon: "bg-emerald-500/10 text-emerald-400",
-    border: "border-emerald-500/10",
-    value: "text-emerald-400",
-    glow: "from-emerald-500/5",
+    icon: "bg-emerald-100 text-emerald-700",
+    border: "border-emerald-200",
+    value: "text-emerald-700",
+    glow: "from-emerald-100",
   },
   blocked: {
-    icon: "bg-red-500/10 text-red-400",
-    border: "border-red-500/10",
-    value: "text-red-400",
-    glow: "from-red-500/5",
+    icon: "bg-rose-100 text-rose-700",
+    border: "border-rose-200",
+    value: "text-rose-700",
+    glow: "from-rose-100",
   },
   suspicious: {
-    icon: "bg-amber-500/10 text-amber-400",
-    border: "border-amber-500/10",
-    value: "text-amber-400",
-    glow: "from-amber-500/5",
+    icon: "bg-amber-100 text-amber-700",
+    border: "border-amber-200",
+    value: "text-amber-700",
+    glow: "from-amber-100",
   },
 };
 
 export default function StatCard({ label, value, type = "total" }) {
   const s = styles[type];
   return (
-    <div className={`relative overflow-hidden rounded-xl border ${s.border} bg-gray-900/50 p-5 transition-all duration-200 hover:bg-gray-900/80 hover:shadow-lg`}>
+    <div className={`relative overflow-hidden rounded-xl border ${s.border} bg-white p-5 transition-all duration-200 hover:shadow-md`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${s.glow} to-transparent pointer-events-none`} />
       <div className="relative flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">{label}</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</p>
           <p className={`text-3xl font-bold tabular-nums ${s.value}`}>{value}</p>
         </div>
         <div className={`p-2.5 rounded-lg ${s.icon}`}>
