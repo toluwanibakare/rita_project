@@ -31,7 +31,7 @@ export default function HomePage() {
         <div className="absolute -top-16 -right-16 w-52 h-52 rounded-full bg-sky-200/40 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-20 w-52 h-52 rounded-full bg-emerald-200/30 blur-3xl pointer-events-none" />
         <p className="inline-flex px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide border border-sky-200 bg-sky-50 text-sky-700">
-          Final Year Cybersecurity Project
+          Final Year Project
         </p>
         <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight tracking-tight relative">
           IoMT Shield Monitoring Platform
