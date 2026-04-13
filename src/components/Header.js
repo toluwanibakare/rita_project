@@ -42,11 +42,11 @@ export default function Header({ onMenuClick }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 flex items-center px-4 lg:px-6 gap-4">
+    <header className="sticky top-0 z-30 h-16 bg-gradient-to-r from-white/90 via-white/95 to-sky-50/80 backdrop-blur-xl border-b border-slate-200/90 shadow-[0_8px_30px_rgba(15,23,42,0.04)] flex items-center px-4 lg:px-6 gap-4">
       {/* Mobile menu toggle */}
       <button
         onClick={onMenuClick}
-        className="lg:hidden text-slate-500 hover:text-slate-900 p-1.5 -ml-1.5 rounded-lg hover:bg-slate-100"
+        className="lg:hidden text-slate-500 hover:text-slate-900 p-1.5 -ml-1.5 rounded-lg hover:bg-white transition-colors"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -54,12 +54,12 @@ export default function Header({ onMenuClick }) {
       </button>
 
       <div className="min-w-0 flex-1">
-        <h1 className="text-base font-semibold text-slate-900 truncate">{title}</h1>
+        <h1 className="text-base font-bold text-slate-900 truncate tracking-tight">{title}</h1>
         <p className="text-[11px] text-slate-500 truncate hidden sm:block">{description}</p>
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-700 shadow-sm">
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-600" />
@@ -71,13 +71,13 @@ export default function Header({ onMenuClick }) {
           <>
             <Link
               href="/profile"
-              className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+              className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
             >
               {user.fullName || "Profile"}
             </Link>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+              className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors shadow-sm"
             >
               Logout
             </button>
@@ -85,7 +85,7 @@ export default function Header({ onMenuClick }) {
         ) : (
           <Link
             href="/login"
-            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-sky-600 to-blue-600 text-white hover:from-sky-700 hover:to-blue-700 transition-colors shadow-sm"
           >
             Login
           </Link>

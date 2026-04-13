@@ -16,11 +16,27 @@
 body {
   font-family: "Manrope", sans-serif;
   background:
-    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.08), transparent 36%),
-    radial-gradient(circle at 100% 10%, rgba(59, 130, 246, 0.08), transparent 40%),
+    radial-gradient(circle at 0% 0%, rgba(14, 165, 233, 0.12), transparent 34%),
+    radial-gradient(circle at 100% 8%, rgba(59, 130, 246, 0.1), transparent 36%),
+    radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.08), transparent 30%),
     var(--bg);
+  min-height: 100vh;
   color: var(--text);
   @apply antialiased;
+}
+
+::selection {
+  background: rgba(14, 165, 233, 0.18);
+}
+
+@layer components {
+  .surface-card {
+    @apply bg-white/95 border border-slate-200/90 shadow-sm backdrop-blur-sm;
+  }
+
+  .surface-card-hover {
+    @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg;
+  }
 }
 
 /* Light scrollbar for a cleaner dashboard feel */

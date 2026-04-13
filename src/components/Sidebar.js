@@ -74,13 +74,13 @@ export default function Sidebar({ open, onClose }) {
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 h-full w-64 bg-gradient-to-b from-white via-slate-50/60 to-white border-r border-slate-200/90 shadow-[0_0_40px_rgba(15,23,42,0.06)] flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-200 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center">
+        <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-200/80 shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/20">
             <svg className="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
@@ -114,8 +114,8 @@ export default function Sidebar({ open, onClose }) {
                 onClick={onClose}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
                   active
-                    ? "bg-sky-50 text-sky-700 border border-sky-200"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent"
+                    ? "bg-gradient-to-r from-sky-50 to-blue-50 text-sky-700 border border-sky-200 shadow-sm"
+                    : "text-slate-600 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200"
                 }`}
               >
                 <span className={`shrink-0 ${active ? "text-sky-700" : "text-slate-400 group-hover:text-slate-700"}`}>
@@ -137,7 +137,7 @@ export default function Sidebar({ open, onClose }) {
           {user ? (
             <button
               onClick={handleLogout}
-              className="w-full px-3 py-2 rounded-lg text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
+              className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors shadow-sm"
             >
               Logout
             </button>
@@ -145,7 +145,7 @@ export default function Sidebar({ open, onClose }) {
             <Link
               href="/login"
               onClick={onClose}
-              className="block w-full px-3 py-2 rounded-lg text-center text-xs font-medium bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+              className="block w-full px-3 py-2 rounded-lg text-center text-xs font-semibold bg-gradient-to-r from-sky-600 to-blue-600 text-white hover:from-sky-700 hover:to-blue-700 transition-colors shadow-sm"
             >
               Login
             </Link>

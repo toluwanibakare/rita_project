@@ -51,14 +51,15 @@ const styles = {
 export default function StatCard({ label, value, type = "total" }) {
   const s = styles[type];
   return (
-    <div className={`relative overflow-hidden rounded-xl border ${s.border} bg-white p-5 transition-all duration-200 hover:shadow-md`}>
-      <div className={`absolute inset-0 bg-gradient-to-br ${s.glow} to-transparent pointer-events-none`} />
+    <div className={`relative overflow-hidden rounded-2xl border ${s.border} bg-white/95 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${s.glow} via-white to-transparent pointer-events-none`} />
+      <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full bg-white/50 blur-xl pointer-events-none" />
       <div className="relative flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</p>
           <p className={`text-3xl font-bold tabular-nums ${s.value}`}>{value}</p>
         </div>
-        <div className={`p-2.5 rounded-lg ${s.icon}`}>
+        <div className={`p-2.5 rounded-xl shadow-sm ${s.icon}`}>
           {iconMap[type]}
         </div>
       </div>

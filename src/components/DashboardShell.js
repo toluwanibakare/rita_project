@@ -15,11 +15,13 @@ export default function DashboardShell({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-transparent text-slate-900">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:ml-64 min-h-screen flex flex-col">
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 lg:p-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-7">
+          <div className="mx-auto max-w-[1280px]">{children}</div>
+        </main>
       </div>
     </div>
   );

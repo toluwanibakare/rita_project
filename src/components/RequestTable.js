@@ -15,7 +15,7 @@ function formatTime(timestamp) {
 export default function RequestTable({ logs, loading }) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-16 text-center shadow-sm">
+      <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-16 text-center shadow-sm backdrop-blur-sm">
         <div className="inline-flex items-center gap-2 text-sm text-slate-500">
           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -29,7 +29,7 @@ export default function RequestTable({ logs, loading }) {
 
   if (!logs || logs.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-16 text-center shadow-sm">
+      <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-16 text-center shadow-sm backdrop-blur-sm">
         <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
         </svg>
@@ -40,11 +40,11 @@ export default function RequestTable({ logs, loading }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+    <div className="rounded-2xl border border-slate-200/90 bg-white/95 overflow-hidden shadow-sm backdrop-blur-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 bg-slate-50">
+            <tr className="text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200/80 bg-gradient-to-r from-slate-50 to-sky-50/40">
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Device ID</th>
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Heart Rate</th>
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Timestamp</th>
@@ -57,8 +57,8 @@ export default function RequestTable({ logs, loading }) {
             {logs.map((log, i) => (
               <tr
                 key={i}
-                className={`border-b border-slate-200 transition-colors duration-100 hover:bg-slate-50 ${
-                  i % 2 === 0 ? "bg-transparent" : "bg-slate-50/60"
+                className={`border-b border-slate-200/70 transition-colors duration-150 hover:bg-sky-50/50 ${
+                  i % 2 === 0 ? "bg-transparent" : "bg-slate-50/40"
                 }`}
               >
                 <td className="px-5 py-3">

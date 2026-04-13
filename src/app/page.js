@@ -27,11 +27,13 @@ const cards = [
 export default function HomePage() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 py-4 sm:py-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 p-6 sm:p-8 shadow-sm backdrop-blur-sm">
+        <div className="absolute -top-16 -right-16 w-52 h-52 rounded-full bg-sky-200/40 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-52 h-52 rounded-full bg-emerald-200/30 blur-3xl pointer-events-none" />
         <p className="inline-flex px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide border border-sky-200 bg-sky-50 text-sky-700">
           Final Year Cybersecurity Project
         </p>
-        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight">
+        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight tracking-tight relative">
           IoMT Shield Monitoring Platform
         </h1>
         <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
@@ -44,7 +46,7 @@ export default function HomePage() {
           <Link
             key={card.href}
             href={card.href}
-            className={`rounded-2xl border bg-gradient-to-br ${card.accent} p-5 hover:shadow-md transition-all`}
+            className={`rounded-2xl border bg-gradient-to-br ${card.accent} p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300`}
           >
             <h2 className="text-lg font-bold text-slate-900">{card.title}</h2>
             <p className="mt-2 text-sm text-slate-600 leading-relaxed">{card.description}</p>
@@ -62,20 +64,20 @@ export default function HomePage() {
         ))}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
         <h3 className="text-lg font-bold text-slate-900">How It Works</h3>
         <div className="mt-4 grid sm:grid-cols-3 gap-4">
-          <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <article className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Step 1</p>
             <h4 className="mt-1 font-semibold text-slate-900">Data Ingestion</h4>
             <p className="mt-2 text-sm text-slate-600">Simulated devices submit heart-rate readings through API requests.</p>
           </article>
-          <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <article className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Step 2</p>
             <h4 className="mt-1 font-semibold text-slate-900">Threat Detection</h4>
             <p className="mt-2 text-sm text-slate-600">Security checks validate request rate, range, and anomaly patterns.</p>
           </article>
-          <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <article className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Step 3</p>
             <h4 className="mt-1 font-semibold text-slate-900">Response</h4>
             <p className="mt-2 text-sm text-slate-600">Threats are blocked or flagged before records reach hospital systems.</p>
