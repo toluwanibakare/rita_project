@@ -1,89 +1,242 @@
-import Link from "next/link";
+'use client';
 
-const cards = [
-  {
-    href: "/simulator",
-    title: "Device Simulator",
-    description: "Send mock IoMT vitals and run attack scenarios against your security API.",
-    tags: ["POST /api/vitals", "Attack Simulation"],
-    accent: "from-sky-100 to-blue-50 border-sky-200",
-  },
-  {
-    href: "/dashboard",
-    title: "Monitoring Dashboard",
-    description: "Track every processed request, status decisions, and threat reasons in real time.",
-    tags: ["GET /api/logs", "Live Updates"],
-    accent: "from-emerald-100 to-teal-50 border-emerald-200",
-  },
-  {
-    href: "/overview",
-    title: "System Overview",
-    description: "View aggregate metrics and telemetry trends across all inbound traffic.",
-    tags: ["GET /api/stats", "Analytics"],
-    accent: "from-amber-100 to-orange-50 border-amber-200",
-  },
-];
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { getCurrentUser, isAuthenticated } from '@/lib/auth';
 
 export default function HomePage() {
+  const [user, setUser] = useState(null);
+  const [isAuth, setIsAuth] = useState(false);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+    setIsAuth(isAuthenticated());
+  }, []);
+
+  const features = [
+    {
+      title: 'Real-Time Monitoring',
+      description: 'Track every request in real-time with live updates and comprehensive logging.',
+      items: ['Live Request Tracking', 'Threat Visualization', 'Status Filtering'],
+    },
+    {
+      title: 'Security Analytics',
+      description: 'Analyze security metrics and trends across your IoMT infrastructure.',
+      items: ['Traffic Analytics', 'Threat Patterns', 'Performance Metrics'],
+    },
+    {
+      title: 'Attack Simulation',
+      description: 'Test your security posture with realistic attack scenarios and simulations.',
+      items: ['DoS Testing', 'Data Spoofing', 'Anomaly Detection'],
+    },
+    {
+      title: 'Device Management',
+      description: 'Manage and monitor all connected medical devices in your network.',
+      items: ['Device Registry', 'Status Monitoring', 'Configuration'],
+    },
+    {
+      title: 'User Profiles',
+      description: 'Manage user accounts, roles, and organizational settings.',
+      items: ['Profile Management', 'Role-Based Access', 'Organization Setup'],
+    },
+    {
+      title: 'Advanced Reporting',
+      description: 'Generate detailed security reports and compliance documentation.',
+      items: ['PDF Export', 'Compliance Reports', 'Audit Logs'],
+    },
+  ];
+
+  const workflowSteps = [
+    {
+      number: '01',
+      title: 'Data Ingestion',
+      description: 'Medical devices send vitals through secure API endpoints. Each reading is timestamped and validated.',
+    },
+    {
+      number: '02',
+      title: 'Threat Detection',
+      description: 'Multi-stage security pipeline inspects authentication, timing, rate limits, and anomalies.',
+    },
+    {
+      number: '03',
+      title: 'Decision & Response',
+      description: 'Threats are blocked or flagged. Normal traffic flows safely to hospital systems.',
+    },
+    {
+      number: '04',
+      title: 'Audit & Analytics',
+      description: 'All events logged for compliance, forensics, and security insights.',
+    },
+  ];
+
+  const stats = [
+    { label: 'Requests Processed', value: '1M+' },
+    { label: 'Threats Blocked', value: '10K+' },
+    { label: 'Network Uptime', value: '99.9%' },
+    { label: 'Security Score', value: 'A+' },
+  ];
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 py-4 sm:py-6">
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 p-6 sm:p-8 shadow-sm backdrop-blur-sm">
-        <div className="absolute -top-16 -right-16 w-52 h-52 rounded-full bg-sky-200/40 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-52 h-52 rounded-full bg-emerald-200/30 blur-3xl pointer-events-none" />
-        <p className="inline-flex px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide border border-sky-200 bg-sky-50 text-sky-700">
-          Final Year Project
-        </p>
-        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight tracking-tight relative">
-          IoMT Shield Monitoring Platform
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 leading-relaxed">
-          Simulate medical device traffic, inspect API security decisions, and visualize threat handling across a complete Internet of Medical Things pipeline.
-        </p>
-      </section>
-
-      <section className="grid md:grid-cols-3 gap-4">
-        {cards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className={`rounded-2xl border bg-gradient-to-br ${card.accent} p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300`}
-          >
-            <h2 className="text-lg font-bold text-slate-900">{card.title}</h2>
-            <p className="mt-2 text-sm text-slate-600 leading-relaxed">{card.description}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {card.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="px-2 py-0.5 rounded-md text-[11px] font-mono border border-slate-200 bg-white text-slate-600"
-                >
-                  {tag}
-                </span>
-              ))}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header with Logo/Name */}
+        <div className="pt-8 pb-12 border-b border-slate-200/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">I</span>
             </div>
-          </Link>
-        ))}
-      </section>
-
-      <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
-        <h3 className="text-lg font-bold text-slate-900">How It Works</h3>
-        <div className="mt-4 grid sm:grid-cols-3 gap-4">
-          <article className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Step 1</p>
-            <h4 className="mt-1 font-semibold text-slate-900">Data Ingestion</h4>
-            <p className="mt-2 text-sm text-slate-600">Simulated devices submit heart-rate readings through API requests.</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Step 2</p>
-            <h4 className="mt-1 font-semibold text-slate-900">Threat Detection</h4>
-            <p className="mt-2 text-sm text-slate-600">Security checks validate request rate, range, and anomaly patterns.</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Step 3</p>
-            <h4 className="mt-1 font-semibold text-slate-900">Response</h4>
-            <p className="mt-2 text-sm text-slate-600">Threats are blocked or flagged before records reach hospital systems.</p>
-          </article>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">IoMT Shield</h1>
+              <p className="text-sm text-slate-500">Medical Device Security Platform</p>
+            </div>
+          </div>
         </div>
-      </section>
+
+        {/* Hero Section */}
+        <section className="py-16 sm:py-24">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-200 bg-blue-50 mb-6">
+              <span className="w-2 h-2 rounded-full bg-blue-600" />
+              <span className="text-sm font-semibold text-blue-700">
+                {isAuth ? `Welcome back, ${user?.fullName || 'User'}` : 'Cybersecurity Platform'}
+              </span>
+            </div>
+
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+              Secure Your Medical Device Network
+            </h2>
+            <p className="text-lg sm:text-xl text-slate-600 mb-8 leading-relaxed max-w-2xl mx-auto">
+              Monitor, simulate, and analyze Internet of Medical Things security with real-time threat detection and comprehensive analytics.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {isAuth ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Go to Dashboard
+                  </Link>
+                  <Link
+                    href="/simulator"
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-slate-300 text-slate-900 font-semibold hover:bg-slate-50 transition-colors"
+                  >
+                    Run Simulation
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Get Started
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-slate-300 text-slate-900 font-semibold hover:bg-slate-50 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Section */}
+        <section className="py-12 grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+          {stats.map((stat) => (
+            <div key={stat.label} className="text-center">
+              <p className="text-3xl sm:text-4xl font-bold text-blue-600 mb-2">{stat.value}</p>
+              <p className="text-sm text-slate-600">{stat.label}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* Workflow Section */}
+        <section className="py-16 mb-16">
+          <h3 className="text-3xl font-bold text-slate-900 text-center mb-12">How It Works</h3>
+          <div className="grid md:grid-cols-4 gap-6">
+            {workflowSteps.map((step) => (
+              <div key={step.number} className="relative">
+                <div className="mb-4">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">{step.number}</span>
+                  </div>
+                </div>
+                <h4 className="text-lg font-semibold text-slate-900 mb-2">{step.title}</h4>
+                <p className="text-sm text-slate-600 leading-relaxed">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Features Grid */}
+        <section className="py-16 mb-16">
+          <h3 className="text-3xl font-bold text-slate-900 text-center mb-12">Powerful Features</h3>
+          <div className="grid md:grid-cols-3 gap-6">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className="rounded-xl border border-slate-200 bg-white p-6 hover:shadow-lg hover:border-blue-200 transition-all"
+              >
+                <h4 className="text-lg font-semibold text-slate-900 mb-3">{feature.title}</h4>
+                <p className="text-sm text-slate-600 mb-4">{feature.description}</p>
+                <ul className="space-y-2">
+                  {feature.items.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm text-slate-600">
+                      <span className="text-blue-600 font-bold mt-0.5">•</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Quick Access Section */}
+        {isAuth && (
+          <section className="py-16 mb-16">
+            <h3 className="text-3xl font-bold text-slate-900 text-center mb-12">Quick Access</h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <Link
+                href="/dashboard"
+                className="rounded-xl border border-slate-200 bg-white p-8 hover:shadow-lg hover:border-blue-200 transition-all text-center"
+              >
+                <div className="text-3xl mb-3">📊</div>
+                <h4 className="font-semibold text-slate-900 mb-2">Dashboard</h4>
+                <p className="text-sm text-slate-600">Monitor live requests and threats</p>
+              </Link>
+              <Link
+                href="/simulator"
+                className="rounded-xl border border-slate-200 bg-white p-8 hover:shadow-lg hover:border-blue-200 transition-all text-center"
+              >
+                <div className="text-3xl mb-3">🔬</div>
+                <h4 className="font-semibold text-slate-900 mb-2">Simulator</h4>
+                <p className="text-sm text-slate-600">Test security scenarios</p>
+              </Link>
+              <Link
+                href="/overview"
+                className="rounded-xl border border-slate-200 bg-white p-8 hover:shadow-lg hover:border-blue-200 transition-all text-center"
+              >
+                <div className="text-3xl mb-3">📈</div>
+                <h4 className="font-semibold text-slate-900 mb-2">Analytics</h4>
+                <p className="text-sm text-slate-600">View security metrics</p>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {/* Footer */}
+        <section className="py-16 border-t border-slate-200/50 text-center">
+          <p className="text-sm text-slate-600">
+            IoMT Shield © 2026. A comprehensive security monitoring platform for medical device networks.
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

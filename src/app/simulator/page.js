@@ -254,6 +254,7 @@ export default function SimulatorPage() {
           {/* Node 1: Wearable */}
           <div className="flex flex-col items-center z-10 text-center max-w-[120px] relative">
             {activeStep === 'wearable_wait' && <div className="node-glow bg-cyan-500/20"></div>}
+            }
             <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-300 ${isWearableStep ? 'border-cyan-400 bg-cyan-950/40 shadow-cyan-500/20' : 'border-gray-700 bg-gray-900 text-gray-500'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
             </div>
@@ -276,6 +277,7 @@ export default function SimulatorPage() {
           {/* Node 2: Edge Gateway */}
           <div className="flex flex-col items-center z-10 text-center max-w-[120px] relative">
             {activeStep === 'edge_wait' && <div className="node-glow bg-cyan-500/20"></div>}
+            }
             <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-300 ${isEdgeStep ? 'border-cyan-400 bg-cyan-950/40 shadow-cyan-500/20' : 'border-gray-700 bg-gray-900 text-gray-500'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2-2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" /></svg>
             </div>
@@ -298,6 +300,7 @@ export default function SimulatorPage() {
           {/* Node 3: API Gateway Shield */}
           <div className="flex flex-col items-center z-10 text-center max-w-[140px] relative">
             {activeStep === 'gateway_wait' && <div className="node-glow bg-amber-500/20"></div>}
+            }
             <div className={`w-14 h-14 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-300 ${isGatewayStep ? activeStep === 'gateway_blocked' ? 'border-red-500 bg-red-950/20 shadow-red-500/40 scale-105' : 'border-amber-500 bg-amber-950/20 shadow-amber-500/30 scale-105' : 'border-gray-700 bg-gray-900 text-gray-500'}`}>
               {activeStep === 'gateway_blocked' ? (
                 <svg className="w-7 h-7 text-red-500 animate-[bounce_0.5s_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -324,6 +327,7 @@ export default function SimulatorPage() {
           {/* Node 4: Hospital Server */}
           <div className="flex flex-col items-center z-10 text-center max-w-[120px] relative">
             {activeStep === 'hospital' && <div className="node-glow bg-emerald-500/20"></div>}
+            }
             <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-300 ${activeStep === 'hospital' ? 'border-emerald-400 bg-emerald-950/40 shadow-emerald-500/20' : 'border-gray-700 bg-gray-900 text-gray-500'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
             </div>
@@ -413,8 +417,8 @@ export default function SimulatorPage() {
                 <span className="text-[9px] font-normal text-gray-400">Rapid batch to crash node servers</span>
               </button>
               
-              <button onClick={handleSendAnomaly} disabled={loading} className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-500 text-xs font-semibold hover:bg-purple-500/15 disabled:opacity-40 flex flex-col items-start gap-1">
-                <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div> Subtle Anomaly</span>
+              <button onClick={handleSendAnomaly} disabled={loading} className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-500 text-xs font-semibold hover:bg-blue-500/15 disabled:opacity-40 flex flex-col items-start gap-1">
+                <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div> Subtle Anomaly</span>
                 <span className="text-[9px] font-normal text-gray-400">Trigger continuous pattern spikes</span>
               </button>
             </div>
@@ -434,24 +438,29 @@ export default function SimulatorPage() {
               {Object.entries(securityInspection).map(([key, config], idx) => {
                 let border = "border-gray-800/50 bg-gray-900/30";
                 let icon = (<div className="w-4 h-4 rounded-full border border-gray-600"></div>);
+                )
                 let labelColor = "text-gray-400";
 
                 if (config.status === "pass") {
                    border = "border-emerald-500/30 bg-emerald-500/5";
                    labelColor = "text-emerald-400 font-medium";
                    icon = (<svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 8" /></svg>);
+                   )
                 } else if (config.status === "fail") {
                    border = "border-red-500/30 bg-red-500/5";
                    labelColor = "text-red-500 font-medium";
                    icon = (<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>);
+                   )
                 } else if (config.status === "warn") {
                    border = "border-amber-500/30 bg-amber-500/5";
                    labelColor = "text-amber-500 font-medium";
                    icon = (<svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4" /></svg>);
+                   )
                 } else if (config.status === "skipped") {
                    border = "border-gray-800/30 bg-gray-950/20 opacity-40";
                    labelColor = "text-gray-600";
                    icon = (<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>);
+                   )
                 }
 
                 return (

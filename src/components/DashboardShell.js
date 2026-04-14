@@ -1,17 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import { isAuthenticated } from "@/lib/auth";
 
 export default function DashboardShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
   const pathname = usePathname();
   const isAuthPage = pathname === "/login" || pathname === "/signup";
+  const isHomePage = pathname === "/";
+
+  useEffect(() => {
+    setIsAuth(isAuthenticated());
+  }, [pathname]);
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
+  }
+
+  if (isHomePage && !isAuth) {
+    return <div className="min-h-screen bg-white">{children}</div>;
   }
 
   return (
