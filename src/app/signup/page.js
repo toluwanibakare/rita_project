@@ -46,7 +46,7 @@ export default function SignupPage() {
         email: form.email.trim().toLowerCase(),
         password: form.password,
       });
-      router.push("/dashboard");
+      router.push("/simulator");
     } catch (err) {
       setError(err.message || "Signup failed. Please try again.");
     } finally {

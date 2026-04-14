@@ -24,7 +24,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
       await login({ email: email.trim().toLowerCase(), password });
-      router.push("/dashboard");
+      router.push("/simulator");
     } catch (err) {
       setError(err.message || "Login failed. Please try again.");
     } finally {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-sm p-6 sm:p-8">
         <div className="mb-6 text-center">
-          <p className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-[11px] font-semibold tracking-wide uppercase">
+          <p className="inline-flex items-center rounded-full bg-sky-50 text-sky-700 border border-sky-100 px-3 py-1 text-[11px] font-semibold tracking-wide uppercase">
             Welcome Back
           </p>
           <h1 className="mt-3 text-2xl font-extrabold text-slate-900">Login to Your Account</h1>
@@ -50,7 +50,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
               placeholder="you@example.com"
             />
           </div>
@@ -61,7 +61,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
               placeholder="Enter your password"
             />
           </div>
@@ -73,7 +73,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-4 py-2.5 transition-colors"
+            className="w-full rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-4 py-2.5 transition-colors"
           >
             {loading ? "Signing in..." : "Login"}
           </button>
@@ -81,7 +81,7 @@ export default function LoginPage() {
 
         <p className="mt-5 text-center text-sm text-slate-600">
           New here?{" "}
-          <Link href="/signup" className="text-emerald-700 font-semibold hover:text-emerald-800">
+          <Link href="/signup" className="text-sky-700 font-semibold hover:text-sky-800">
             Create an account
           </Link>
         </p>
