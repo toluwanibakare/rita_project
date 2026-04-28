@@ -38,7 +38,7 @@ export async function POST(request) {
       password,
       options: {
         data: { full_name: fullName.trim() },
-        emailRedirectTo: undefined,
+        emailRedirectTo: 'https://iomt-security.vercel.app/login',
       },
     });
 
@@ -83,6 +83,7 @@ export async function POST(request) {
       user,
       token: data.session?.access_token || null,
       refreshToken: data.session?.refresh_token || null,
+      requiresEmailConfirmation: !data.session,
     });
   } catch (err) {
     console.error('Signup error:', err);

@@ -52,67 +52,39 @@ export function isAuthenticated() {
 }
 
 export async function signup({ fullName, email, password }) {
-  try {
-    const data = await requestJson("/api/auth/signup", { fullName, email, password });
-    saveSession(data.user, data.token);
-    return data.user;
-  } catch {
-    // Fallback path for this demo app when auth endpoints are not available.
-    const user = {
-      id: `USR-${Date.now()}`,
-      fullName,
-      email,
-      role: "Analyst",
-      organization: "IoMT Security Lab",
-      phone: "",
-      bio: "",
-    };
-    saveSession(user, "local-signup-token");
-    return user;
+  const data = await requestJson("/api/auth/signup", { fullName, email, password });
+  
+  if (data.requiresEmailConfirmation) {
+    return { requiresEmailConfirmation: true, user: data.user };
   }
+  
+  saveSession(data.user, data.token);
+  return data.user;
 }
 
 export async function login({ email, password }) {
-  try {
-    const data = await requestJson("/api/auth/login", { email, password });
-    saveSession(data.user, data.token);
-    return data.user;
-  } catch {
-    const existingUser = getCurrentUser();
-
-    // For local fallback mode, we allow login for the most recently registered email.
-    if (existingUser && existingUser.email === email && password.length >= 6) {
-      saveSession(existingUser, "local-login-token");
-      return existingUser;
-    }
-
-    throw new Error("Invalid credentials. Please check your email and password.");
-  }
+  const data = await requestJson("/api/auth/login", { email, password });
+  saveSession(data.user, data.token);
+  return data.user;
 }
 
 export async function updateProfile(nextProfile) {
   const { token } = loadSession();
 
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/profile`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${token}` : "",
-      },
-      body: JSON.stringify(nextProfile),
-    });
+  const res = await fetch(`${API_BASE}/api/auth/profile`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    body: JSON.stringify(nextProfile),
+  });
 
-    if (!res.ok) throw new Error("Failed profile update");
+  if (!res.ok) throw new Error("Failed profile update");
 
-    const data = await res.json();
-    saveSession(data.user, token || data.token);
-    return data.user;
-  } catch {
-    const merged = { ...getCurrentUser(), ...nextProfile };
-    saveSession(merged, token || "local-profile-token");
-    return merged;
-  }
+  const data = await res.json();
+  saveSession(data.user, token || data.token);
+  return data.user;
 }
 
 export function logout() {

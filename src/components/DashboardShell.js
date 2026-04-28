@@ -8,14 +8,19 @@ import { isAuthenticated } from "@/lib/auth";
 
 export default function DashboardShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isAuth, setIsAuth] = useState(false);
+  const [isAuth, setIsAuth] = useState(true); // Default true to prevent hydration flash
   const pathname = usePathname();
   const isAuthPage = pathname === "/login" || pathname === "/signup";
   const isHomePage = pathname === "/";
 
   useEffect(() => {
-    setIsAuth(isAuthenticated());
-  }, [pathname]);
+    const authenticated = isAuthenticated();
+    setIsAuth(authenticated);
+    
+    if (!authenticated && !isAuthPage && !isHomePage) {
+      window.location.href = "/login";
+    }
+  }, [pathname, isAuthPage, isHomePage]);
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
@@ -23,6 +28,10 @@ export default function DashboardShell({ children }) {
 
   if (isHomePage && !isAuth) {
     return <div className="min-h-screen bg-white">{children}</div>;
+  }
+
+  if (!isAuth && !isAuthPage && !isHomePage) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>;
   }
 
   return (

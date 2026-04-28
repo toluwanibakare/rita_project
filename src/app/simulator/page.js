@@ -286,9 +286,12 @@ export default function SimulatorPage() {
           </div>
 
           {/* Wire 1 */}
-          <div className="flex-1 h-px md:h-auto md:w-24 relative flex items-center justify-center min-w-[60px]">
+          <div className="h-10 w-px md:h-auto md:flex-1 md:w-24 relative flex items-center justify-center min-h-[40px] md:min-h-[auto] md:min-w-[60px]">
             <svg className="absolute w-full h-full overflow-visible">
-              <line x1="0" y1="50%" x2="100%" y2="50%" stroke={activeStep === 'wearable_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={activeStep === 'wearable_travel' ? 'alive-link' : ''} />
+              {/* Desktop horizontal line */}
+              <line x1="0" y1="50%" x2="100%" y2="50%" stroke={activeStep === 'wearable_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={`hidden md:block ${activeStep === 'wearable_travel' ? 'alive-link' : ''}`} />
+              {/* Mobile vertical line */}
+              <line x1="50%" y1="0" x2="50%" y2="100%" stroke={activeStep === 'wearable_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={`md:hidden ${activeStep === 'wearable_travel' ? 'alive-link' : ''}`} />
             </svg>
             {activeStep === 'wearable_travel' && (
               <div className="packet-pulse w-5 h-5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-500/50 flex items-center justify-center">
@@ -315,9 +318,12 @@ export default function SimulatorPage() {
           </div>
 
           {/* Wire 2 */}
-          <div className="flex-1 h-px md:h-auto md:w-24 relative flex items-center justify-center min-w-[60px]">
+          <div className="h-10 w-px md:h-auto md:flex-1 md:w-24 relative flex items-center justify-center min-h-[40px] md:min-h-[auto] md:min-w-[60px]">
             <svg className="absolute w-full h-full overflow-visible">
-              <line x1="0" y1="50%" x2="100%" y2="50%" stroke={activeStep === 'edge_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={activeStep === 'edge_travel' ? 'alive-link' : ''} />
+              {/* Desktop horizontal line */}
+              <line x1="0" y1="50%" x2="100%" y2="50%" stroke={activeStep === 'edge_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={`hidden md:block ${activeStep === 'edge_travel' ? 'alive-link' : ''}`} />
+              {/* Mobile vertical line */}
+              <line x1="50%" y1="0" x2="50%" y2="100%" stroke={activeStep === 'edge_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={`md:hidden ${activeStep === 'edge_travel' ? 'alive-link' : ''}`} />
             </svg>
             {activeStep === 'edge_travel' && (
               <div className="packet-pulse w-5 h-5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-500/50 flex items-center justify-center">
@@ -358,9 +364,12 @@ export default function SimulatorPage() {
           </div>
 
           {/* Wire 3 */}
-          <div className="flex-1 h-px md:h-auto md:w-24 relative flex items-center justify-center min-w-[60px]">
+          <div className="h-10 w-px md:h-auto md:flex-1 md:w-24 relative flex items-center justify-center min-h-[40px] md:min-h-[auto] md:min-w-[60px]">
             <svg className="absolute w-full h-full overflow-visible">
-              <line x1="0" y1="50%" x2="100%" y2="50%" stroke={activeStep === 'gateway_travel' ? '#F59E0B' : '#334155'} strokeWidth="2" className={activeStep === 'gateway_travel' ? 'alive-link' : ''} />
+              {/* Desktop horizontal line */}
+              <line x1="0" y1="50%" x2="100%" y2="50%" stroke={activeStep === 'gateway_travel' ? '#F59E0B' : '#334155'} strokeWidth="2" className={`hidden md:block ${activeStep === 'gateway_travel' ? 'alive-link' : ''}`} />
+              {/* Mobile vertical line */}
+              <line x1="50%" y1="0" x2="50%" y2="100%" stroke={activeStep === 'gateway_travel' ? '#F59E0B' : '#334155'} strokeWidth="2" className={`md:hidden ${activeStep === 'gateway_travel' ? 'alive-link' : ''}`} />
             </svg>
             {activeStep === 'gateway_travel' && (
               <div className="packet-pulse w-5 h-5 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50 flex items-center justify-center">
