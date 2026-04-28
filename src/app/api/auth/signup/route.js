@@ -59,6 +59,14 @@ export async function POST(request) {
       );
     }
 
+    // Supabase returns an empty identities array if the email is already registered
+    if (data.user?.identities?.length === 0) {
+      return NextResponse.json(
+        { error: 'An account with this email already exists.' },
+        { status: 409 }
+      );
+    }
+
     if (data.user.id) {
       await supabase.from('profiles').upsert({
         id: data.user.id,
