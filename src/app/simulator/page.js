@@ -210,16 +210,34 @@ export default function SimulatorPage() {
           50% { transform: translateY(-5px); }
           100% { transform: translateY(0px); }
         }
+        @keyframes packetFlowVertical {
+          0% { top: 0%; opacity: 0; transform: translateX(-50%) scale(0.6); }
+          15% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+          85% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+          100% { top: 100%; opacity: 0; transform: translateX(-50%) scale(0.6); }
+        }
         .alive-link {
           stroke-dasharray: 6 6;
           animation: marquee 1s linear infinite;
         }
         .packet-pulse {
           position: absolute;
-          top: 50%;
           border-radius: 9999px;
-          animation: packetFlow 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
           z-index: 30;
+        }
+        @media (min-width: 768px) {
+          .packet-pulse {
+            top: 50%;
+            left: 0%;
+            animation: packetFlow 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          }
+        }
+        @media (max-width: 767px) {
+          .packet-pulse {
+            top: 0%;
+            left: 50%;
+            animation: packetFlowVertical 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          }
         }
         .node-glow {
           position: absolute;
@@ -271,7 +289,7 @@ export default function SimulatorPage() {
           <div className="flex flex-col items-center z-10 text-center min-w-[120px] relative group">
             {activeStep === 'wearable_wait' && <div className="node-glow bg-cyan-500/30"></div>}
             
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
               isWearableStep 
                 ? 'border-cyan-400 bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 shadow-cyan-500/30 scale-110' 
                 : 'border-slate-700 bg-slate-50 text-slate-500'
@@ -294,8 +312,9 @@ export default function SimulatorPage() {
               <line x1="50%" y1="0" x2="50%" y2="100%" stroke={activeStep === 'wearable_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={`md:hidden ${activeStep === 'wearable_travel' ? 'alive-link' : ''}`} />
             </svg>
             {activeStep === 'wearable_travel' && (
-              <div className="packet-pulse w-5 h-5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-500/50 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-white"></div>
+              <div className="packet-pulse w-6 h-6 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400 animate-[spin_1.5s_linear_infinite]"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
               </div>
             )}
           </div>
@@ -304,7 +323,7 @@ export default function SimulatorPage() {
           <div className="flex flex-col items-center z-10 text-center min-w-[120px] relative group">
             {activeStep === 'edge_wait' && <div className="node-glow bg-cyan-500/30"></div>}
             
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
               isEdgeStep 
                 ? 'border-cyan-400 bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 shadow-cyan-500/30 scale-110' 
                 : 'border-slate-700 bg-slate-50 text-slate-500'
@@ -326,8 +345,9 @@ export default function SimulatorPage() {
               <line x1="50%" y1="0" x2="50%" y2="100%" stroke={activeStep === 'edge_travel' ? '#22D3EE' : '#334155'} strokeWidth="2" className={`md:hidden ${activeStep === 'edge_travel' ? 'alive-link' : ''}`} />
             </svg>
             {activeStep === 'edge_travel' && (
-              <div className="packet-pulse w-5 h-5 rounded-full bg-cyan-400 shadow-lg shadow-cyan-500/50 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-white"></div>
+              <div className="packet-pulse w-6 h-6 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400 animate-[spin_1.5s_linear_infinite]"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
               </div>
             )}
           </div>
@@ -336,7 +356,7 @@ export default function SimulatorPage() {
           <div className="flex flex-col items-center z-10 text-center min-w-[140px] relative group">
             {activeStep === 'gateway_wait' && <div className="node-glow bg-amber-500/30"></div>}
             
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
               isGatewayStep 
                 ? activeStep === 'gateway_blocked' 
                   ? 'border-red-500 bg-gradient-to-br from-red-500/20 to-red-600/10 shadow-red-500/30 scale-110' 
@@ -372,8 +392,9 @@ export default function SimulatorPage() {
               <line x1="50%" y1="0" x2="50%" y2="100%" stroke={activeStep === 'gateway_travel' ? '#F59E0B' : '#334155'} strokeWidth="2" className={`md:hidden ${activeStep === 'gateway_travel' ? 'alive-link' : ''}`} />
             </svg>
             {activeStep === 'gateway_travel' && (
-              <div className="packet-pulse w-5 h-5 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-white"></div>
+              <div className="packet-pulse w-6 h-6 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 border-dashed border-amber-500 animate-[spin_1.5s_linear_infinite]"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></div>
               </div>
             )}
           </div>
@@ -382,7 +403,7 @@ export default function SimulatorPage() {
           <div className="flex flex-col items-center z-10 text-center min-w-[120px] relative group">
             {activeStep === 'hospital' && <div className="node-glow bg-emerald-500/30"></div>}
             
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 shadow-2xl transition-all duration-500 transform group-hover:scale-105 ${
               activeStep === 'hospital' 
                 ? 'border-emerald-400 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 shadow-emerald-500/30 scale-110' 
                 : 'border-slate-700 bg-slate-50 text-slate-500'
