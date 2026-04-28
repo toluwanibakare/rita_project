@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import store from '@/lib/store';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 /**
  * GET /api/logs
@@ -16,10 +21,19 @@ import store from '@/lib/store';
  */
 export async function GET() {
   try {
-    // Return all logged events from our in-memory store
-    // The vitals API uses "unshift()" to add new logs, so this array 
-    // is already sorted from most recent to oldest.
-    return NextResponse.json(store.logs);
+    // Fetch the 50 most recent logs from Supabase
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Supabase fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
   } catch (error) {
     console.error('API /logs Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

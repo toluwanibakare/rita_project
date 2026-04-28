@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import store from '@/lib/store';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 /**
  * POST /api/vitals
@@ -48,7 +54,7 @@ export async function POST(request) {
      * Processes the final outcome of the request, updates the device's last request time,
      * logs the event, and returns the strictly formatted JSON response.
      */
-    const resolveRequest = (status, reason, stage, reachedHospital) => {
+    const resolveRequest = async (status, reason, stage, reachedHospital) => {
       deviceState.lastRequestTime = now;
 
       const logEntry = {
@@ -64,6 +70,9 @@ export async function POST(request) {
       };
 
       store.logs.unshift(logEntry);
+      
+      // Fire and forget to Supabase (or await it to ensure it saves)
+      await supabase.from('logs').insert([logEntry]);
 
       return NextResponse.json({
         status,
@@ -81,7 +90,7 @@ export async function POST(request) {
     // ==========================================
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer iomt_secure_')) {
-      return resolveRequest('BLOCKED', 'Unauthorized: Invalid or missing device authorization token', 'Authentication', false);
+      return await resolveRequest('BLOCKED', 'Unauthorized: Invalid or missing device authorization token', 'Authentication', false);
     }
 
     // ==========================================
@@ -90,21 +99,21 @@ export async function POST(request) {
     const clientTime = new Date(timestamp).getTime();
     const timeDrift = Math.abs(Date.now() - clientTime);
     if (timeDrift > 300000) { // 5 minutes window
-      return resolveRequest('BLOCKED', 'Anti-Replay Trigger: Data timestamp is too far in the past/future', 'Timestamp Validation', false);
+      return await resolveRequest('BLOCKED', 'Anti-Replay Trigger: Data timestamp is too far in the past/future', 'Timestamp Validation', false);
     }
 
     // ==========================================
     // LAYER 1: RATE LIMITING (DoS Mitigation)
     // ==========================================
     if (timeSinceLast < 800) {
-      return resolveRequest('BLOCKED', 'Rate limit exceeded: requests arriving too frequently', 'Rate Limiting', false);
+      return await resolveRequest('BLOCKED', 'Rate limit exceeded: requests arriving too frequently', 'Rate Limiting', false);
     }
 
     // ==========================================
     // LAYER 2: MEDICAL RANGE VALIDATION (Spoofing)
     // ==========================================
     if (heartRate < 30 || heartRate > 220) {
-      return resolveRequest('BLOCKED', 'Invalid physiological value: outside human survival range (30-220 bpm)', 'Medical Range Validation', false);
+      return await resolveRequest('BLOCKED', 'Invalid physiological value: outside human survival range (30-220 bpm)', 'Medical Range Validation', false);
     }
 
     // ==========================================
@@ -131,7 +140,7 @@ export async function POST(request) {
     const reachedHospital = true;
     const finalStage = outcomeStatus === 'NORMAL' ? 'Hospital Server' : 'Anomaly Detection';
 
-    return resolveRequest(outcomeStatus, outcomeReason, finalStage, reachedHospital);
+    return await resolveRequest(outcomeStatus, outcomeReason, finalStage, reachedHospital);
     
   } catch (error) {
     // Catch-all for any unexpected errors (e.g., malformed JSON)
