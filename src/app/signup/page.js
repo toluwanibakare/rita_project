@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { signup } from "@/lib/auth";
+import { useEffect, useState } from "react";
+import { signup, resendVerificationEmail } from "@/lib/auth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,6 +18,33 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [countdown, setCountdown] = useState(120);
+  const [isResending, setIsResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
+  useEffect(() => {
+    let timer;
+    if (successMessage && countdown > 0) {
+      timer = setInterval(() => setCountdown((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [successMessage, countdown]);
+
+  const handleResend = async () => {
+    if (countdown > 0) return;
+    try {
+      setIsResending(true);
+      setResendMessage("");
+      await resendVerificationEmail(registeredEmail);
+      setResendMessage("Verification email resent successfully!");
+      setCountdown(120); // Reset countdown
+    } catch (err) {
+      setResendMessage(err.message || "Failed to resend email.");
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -52,7 +79,9 @@ export default function SignupPage() {
       
       if (data?.requiresEmailConfirmation) {
         setSuccessMessage("Please check your email to confirm your account before logging in.");
+        setRegisteredEmail(data.email || form.email.trim().toLowerCase());
         setForm({ fullName: "", email: "", password: "", confirmPassword: "" });
+        setCountdown(120);
       } else {
         router.push("/simulator");
       }
@@ -85,10 +114,26 @@ export default function SignupPage() {
             <p className="text-sm text-slate-600 mb-6">{successMessage}</p>
             <Link
               href="/login"
-              className="inline-flex justify-center w-full rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2.5 transition-colors"
+              className="inline-flex justify-center w-full rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2.5 transition-colors mb-4"
             >
               Go to Login
             </Link>
+
+            <div className="pt-4 border-t border-slate-100">
+              <p className="text-xs text-slate-500 mb-2">Email not received?</p>
+              <button
+                onClick={handleResend}
+                disabled={countdown > 0 || isResending}
+                className="text-sm font-semibold text-sky-700 hover:text-sky-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isResending ? "Resending..." : countdown > 0 ? `Resend email in ${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : "Resend Verification Email"}
+              </button>
+              {resendMessage && (
+                <p className={`mt-2 text-xs ${resendMessage.includes("successfully") ? "text-emerald-600" : "text-rose-600"}`}>
+                  {resendMessage}
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

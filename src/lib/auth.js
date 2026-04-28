@@ -55,11 +55,15 @@ export async function signup({ fullName, email, password }) {
   const data = await requestJson("/api/auth/signup", { fullName, email, password });
   
   if (data.requiresEmailConfirmation) {
-    return { requiresEmailConfirmation: true, user: data.user };
+    return { requiresEmailConfirmation: true, user: data.user, email };
   }
   
   saveSession(data.user, data.token);
   return data.user;
+}
+
+export async function resendVerificationEmail(email) {
+  return await requestJson("/api/auth/resend", { email });
 }
 
 export async function login({ email, password }) {

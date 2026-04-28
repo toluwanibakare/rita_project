@@ -28,6 +28,7 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     if (!email.trim() || !password.trim()) {
       setError("Please enter both email and password.");
