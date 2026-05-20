@@ -82,6 +82,9 @@ export default function SimulatorPage() {
 
       if (result.status === "BLOCKED") {
         setActiveStep("gateway_blocked");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("security-alarm", { detail: result }));
+        }
         if (result.stage === "Authentication") {
           setSecurityInspection({
             authCheck: { status: "fail", label: "Unauthorized Access" },
