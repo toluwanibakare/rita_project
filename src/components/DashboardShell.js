@@ -89,16 +89,26 @@ export default function DashboardShell({ children }) {
           50% { background-color: rgb(159, 18, 57); }
           100% { background-color: rgb(225, 29, 72); }
         }
+        @keyframes siteRedFlash {
+          0% { background-color: rgba(225, 29, 72, 0); }
+          50% { background-color: rgba(225, 29, 72, 0.15); }
+          100% { background-color: rgba(225, 29, 72, 0); }
+        }
       `}} />
 
       {/* 2. Pulsing Flashing Screen Border for Code Red */}
       {alarmActive && (
-        <div className="fixed inset-0 pointer-events-none z-50 border-[6px] border-rose-600 animate-[borderPulse_1.5s_infinite] shadow-[inset_0_0_80px_rgba(225,29,72,0.7)]" />
+        <div className="fixed inset-y-0 left-0 lg:left-64 right-0 pointer-events-none z-40 border-[6px] border-rose-600 animate-[borderPulse_1.5s_infinite] shadow-[inset_0_0_80px_rgba(225,29,72,0.7)]" />
+      )}
+
+      {/* 2.5. Full Screen semi-transparent red flashing overlay (site flashing red) */}
+      {alarmActive && (
+        <div className="fixed inset-y-0 left-0 lg:left-64 right-0 pointer-events-none z-30 animate-[siteRedFlash_1.5s_infinite]" />
       )}
 
       {/* 3. Global Flashing Caution Banner at the Top */}
       {alarmActive && (
-        <div className="fixed top-0 left-0 right-0 h-16 z-50 text-white px-4 lg:px-6 flex items-center justify-between shadow-2xl animate-[bannerFlash_1.2s_infinite] border-b-2 border-rose-900 select-none">
+        <div className="fixed top-0 left-0 lg:left-64 right-0 h-16 z-40 text-white px-4 lg:px-6 flex items-center justify-between shadow-2xl animate-[bannerFlash_1.2s_infinite] border-b-2 border-rose-900 select-none">
           <div className="flex items-center gap-3">
             {/* Pulsing warning sign */}
             <span className="p-1.5 rounded-lg bg-white text-rose-600 shadow-sm animate-bounce flex items-center justify-center">
