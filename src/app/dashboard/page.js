@@ -11,9 +11,9 @@ export default function DashboardPage() {
   async function loadLogs() {
     try {
       const data = await fetchLogs();
-      setLogs(Array.isArray(data) ? data : data.logs || []);
-    } catch {
-      console.error("Failed to fetch logs");
+      setLogs(Array.isArray(data) ? data : (data && data.logs) || []);
+    } catch (err) {
+      console.error("Failed to fetch logs", err);
     }
     setLoading(false);
   }

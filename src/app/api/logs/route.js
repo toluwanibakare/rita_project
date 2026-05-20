@@ -34,7 +34,27 @@ export async function GET() {
       return NextResponse.json(store.logs.slice(0, 50));
     }
 
-    return NextResponse.json(data);
+    // Resilient Merging: Combine local store logs and Supabase logs to guarantee
+    // that even if DB inserts fail or are slow, the active simulator entries show up!
+    const dbLogs = data || [];
+    const mergedLogs = [...store.logs];
+
+    dbLogs.forEach((dbLog) => {
+      // Avoid duplicate logs if they are already in the local store
+      const exists = mergedLogs.some(
+        (localLog) => 
+          localLog.timestamp === dbLog.timestamp && 
+          localLog.deviceId === dbLog.deviceId
+      );
+      if (!exists) {
+        mergedLogs.push(dbLog);
+      }
+    });
+
+    // Sort all records by timestamp in descending order (newest first)
+    mergedLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    return NextResponse.json(mergedLogs.slice(0, 50));
   } catch (error) {
     console.warn('API /logs Error, falling back to in-memory store:', error);
     return NextResponse.json(store.logs.slice(0, 50));
