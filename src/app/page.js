@@ -36,9 +36,9 @@ export default function HomePage() {
       ),
     },
     {
-      title: "Attack Simulation",
-      description: "Test your system with realistic attack scenarios.",
-      items: ["DoS Testing", "Data Spoofing", "Anomaly Detection"],
+      title: "Telemetry Diagnostics",
+      description: "Run clinical telemetry diagnostic stress tests.",
+      items: ["Stress Scanning", "Falsified Range Verification", "ML Drift Detection"],
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -286,7 +286,7 @@ export default function HomePage() {
                 },
                 { 
                   title: "Simulator", 
-                  desc: "Run attack scenarios and test security", 
+                  desc: "Simulate device telemetry and stress tests", 
                   link: "/simulator",
                   icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

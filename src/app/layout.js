@@ -3,7 +3,7 @@ import DashboardShell from "@/components/DashboardShell";
 
 export const metadata = {
   title: "IoMT Security Dashboard",
-  description: "Internet of Medical Things — Attack Detection & Monitoring",
+  description: "Internet of Medical Things — Telemetry Security & Database Protection",
 };
 
 export default function RootLayout({ children }) {

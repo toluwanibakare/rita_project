@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import store from '@/lib/store';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -21,7 +22,7 @@ const supabase = createClient(
  */
 export async function GET() {
   try {
-    // Fetch the 50 most recent logs from Supabase
+    // Attempt to fetch the 50 most recent logs from Supabase
     const { data, error } = await supabase
       .from('logs')
       .select('*')
@@ -29,13 +30,13 @@ export async function GET() {
       .limit(50);
 
     if (error) {
-      console.error('Supabase fetch error:', error);
-      return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
+      console.warn('Supabase fetch error, falling back to in-memory store:', error);
+      return NextResponse.json(store.logs.slice(0, 50));
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('API /logs Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.warn('API /logs Error, falling back to in-memory store:', error);
+    return NextResponse.json(store.logs.slice(0, 50));
   }
 }

@@ -29,11 +29,17 @@ const config = {
     border: "border-slate-200",
     dot: "bg-slate-500",
   },
-  ATTACK_COMPLETE: {
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-    border: "border-orange-200",
-    dot: "bg-orange-500",
+  SCAN_COMPLETE: {
+    bg: "bg-sky-50",
+    text: "text-sky-700",
+    border: "border-sky-200",
+    dot: "bg-sky-500",
+  },
+  STRESS_TEST_COMPLETE: {
+    bg: "bg-purple-50",
+    text: "text-purple-700",
+    border: "border-purple-200",
+    dot: "bg-purple-500",
   },
 };
 

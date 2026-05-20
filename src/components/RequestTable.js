@@ -39,6 +39,38 @@ export default function RequestTable({ logs, loading }) {
     );
   }
 
+  const renderDbProtection = (type) => {
+    const t = type || 'Isolated (No Write)';
+    if (t.includes('Safe') || t.includes('Parameterized')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          Secure Parameterization
+        </span>
+      );
+    }
+    if (t.includes('SQLi') || t.includes('Blocked')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+          <svg className="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Blocked: SQLi Prevented
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded bg-slate-50 text-slate-600 border border-slate-200">
+        <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        </svg>
+        Isolated (No DB Write)
+      </span>
+    );
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-white/95 overflow-hidden shadow-sm backdrop-blur-sm">
       <div className="overflow-x-auto">
@@ -49,6 +81,7 @@ export default function RequestTable({ logs, loading }) {
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Heart Rate</th>
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Timestamp</th>
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Decision</th>
+              <th className="px-5 py-3 sticky top-0 bg-slate-50">Database Shield</th>
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Diagnostics Stage</th>
               <th className="px-5 py-3 sticky top-0 bg-slate-50">Reason</th>
             </tr>
@@ -75,6 +108,9 @@ export default function RequestTable({ logs, loading }) {
                 </td>
                 <td className="px-5 py-3">
                   <StatusBadge status={log.status || log.decision} />
+                </td>
+                <td className="px-5 py-3">
+                  {renderDbProtection(log.dbProtectionType)}
                 </td>
                 <td className="px-5 py-3 text-slate-600 text-xs">
                   {log.stage || "—"}

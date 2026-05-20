@@ -39,7 +39,7 @@ export async function POST(request) {
     if (!store.deviceStates[deviceId]) {
       store.deviceStates[deviceId] = {
         lastRequestTime: null,
-        history: []
+        history: [72, 70, 74, 71, 73] // Pre-populate baseline history so anomaly detection works instantly
       };
     }
 
@@ -54,8 +54,14 @@ export async function POST(request) {
      * Processes the final outcome of the request, updates the device's last request time,
      * logs the event, and returns the strictly formatted JSON response.
      */
-    const resolveRequest = async (status, reason, stage, reachedHospital) => {
+    const resolveRequest = async (status, reason, stage, reachedHospital, dbProtection = null) => {
       deviceState.lastRequestTime = now;
+
+      // Determine database safeguard classification
+      const defaultDbProtection = reachedHospital 
+        ? 'Parameterized Query (Safe)' 
+        : 'Isolated (No Write)';
+      const dbProtectionStatus = dbProtection || defaultDbProtection;
 
       const logEntry = {
         deviceId,
@@ -66,13 +72,21 @@ export async function POST(request) {
         stage, 
         reachedHospitalServer: reachedHospital,
         gatewayId: gatewayId || 'GW-EDGE-01',
-        requestOrigin: `192.168.1.${Math.floor(Math.random() * 254) + 1}`
+        requestOrigin: `192.168.1.${Math.floor(Math.random() * 254) + 1}`,
+        dbProtectionType: dbProtectionStatus
       };
 
       store.logs.unshift(logEntry);
       
-      // Fire and forget to Supabase (or await it to ensure it saves)
-      await supabase.from('logs').insert([logEntry]);
+      // Attempt to save to Supabase, catching any errors to maintain local store availability
+      try {
+        const { error } = await supabase.from('logs').insert([logEntry]);
+        if (error) {
+          console.warn('Supabase insert error (saved to in-memory store only):', error);
+        }
+      } catch (dbError) {
+        console.warn('Supabase connection error (saved to in-memory store only):', dbError);
+      }
 
       return NextResponse.json({
         status,
@@ -81,7 +95,8 @@ export async function POST(request) {
         heartRate,
         timestamp,
         stage,
-        reachedHospitalServer: reachedHospital
+        reachedHospitalServer: reachedHospital,
+        dbProtectionType: dbProtectionStatus
       });
     };
 
@@ -100,6 +115,21 @@ export async function POST(request) {
     const timeDrift = Math.abs(Date.now() - clientTime);
     if (timeDrift > 300000) { // 5 minutes window
       return await resolveRequest('BLOCKED', 'Anti-Replay Trigger: Data timestamp is too far in the past/future', 'Timestamp Validation', false);
+    }
+
+    // ==========================================
+    // LAYER 0.8: INPUT SANITIZATION & SQL INJECTION (SQLi) SHIELD
+    // ==========================================
+    // Check text inputs (deviceId & gatewayId) for hazardous SQL constructs (', --, ;, UNION, SELECT, etc.)
+    const sqlRegex = /[\'\"]|--|;|union|select|insert|update|delete|drop|or\s+1\s*=\s*1/i;
+    if (sqlRegex.test(deviceId) || (gatewayId && sqlRegex.test(gatewayId))) {
+      return await resolveRequest(
+        'BLOCKED', 
+        'Database Shield Trigger: SQL Injection patterns intercepted in gateway headers or device identifiers.', 
+        'SQLi Sanitization', 
+        false, 
+        'Blocked: SQLi Prevented'
+      );
     }
 
     // ==========================================
@@ -128,7 +158,7 @@ export async function POST(request) {
       
       if (Math.abs(heartRate - average) > 40) {
         outcomeStatus = 'FLAGGED';
-        outcomeReason = 'Suspicious pattern: excessive deviation from historical average';
+        outcomeReason = 'Flagged: Telemetry deviation exceeds baseline';
       }
     }
 

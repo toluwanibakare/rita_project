@@ -17,7 +17,7 @@ const pageTitles = {
 
 const pageDescriptions = {
   "/": "IoMT Security Simulation System",
-  "/simulator": "Simulate IoMT device data transmissions and attack scenarios",
+  "/simulator": "Simulate IoMT device data transmissions and defensive stress tests",
   "/dashboard": "Real-time monitoring of all processed device requests",
   "/overview": "Aggregate statistics and system health metrics",
   "/profile": "Manage your personal details and account settings",
