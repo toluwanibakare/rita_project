@@ -31,11 +31,13 @@ CREATE INDEX IF NOT EXISTS idx_logs_decision ON public.logs(decision);
 -- --------------------------------------------------
 ALTER TABLE public.logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public insert" ON public.logs;
 CREATE POLICY "Allow public insert" 
   ON public.logs FOR INSERT 
   TO anon 
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public select" ON public.logs;
 CREATE POLICY "Allow public select" 
   ON public.logs FOR SELECT 
   TO anon 
@@ -60,16 +62,19 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- RLS Policies for profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT
   TO authenticated
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   TO authenticated
