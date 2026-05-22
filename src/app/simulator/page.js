@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { sendDeviceData, simulateAttack, fetchLogs } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
 
 export default function SimulatorPage() {
@@ -11,6 +12,9 @@ export default function SimulatorPage() {
   const [loading, setLoading] = useState(false);
   const [currentResponse, setCurrentResponse] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
+  const [bypassShield, setBypassShield] = useState(false);
+  const [currentRequest, setCurrentRequest] = useState(null);
+  const [activeTab, setActiveTab] = useState("summary");
 
   // Animation & Flow state
   const [activeStep, setActiveStep] = useState(null); // 'wearable' | 'edge' | 'gateway' | 'hospital'
@@ -42,9 +46,40 @@ export default function SimulatorPage() {
   }
 
   useEffect(() => {
+    // 1. Initial fetch
     loadLogs();
-    const interval = setInterval(loadLogs, 4000);
-    return () => clearInterval(interval);
+
+    // 2. Real-time Subscription to automatically sync log stream
+    const channel = supabase
+      .channel("simulator-logs")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "logs" },
+        (payload) => {
+          setRecentLogs((prev) => {
+            const exists = prev.some(
+              (log) => 
+                log.timestamp === payload.new.timestamp && 
+                log.deviceId === payload.new.deviceId
+            );
+            if (exists) return prev;
+
+            const formattedLog = {
+              ...payload.new,
+              heartRate: Number(payload.new.heartRate)
+            };
+            return [formattedLog, ...prev].slice(0, 50);
+          });
+
+          // Quietly sync with server-side merged store
+          loadLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Helper inside sending flow to animate steps
@@ -133,10 +168,13 @@ export default function SimulatorPage() {
         }
         setFlowStatus(p => ({ ...p, gateway: "error" }));
       } else if (result.status === "FLAGGED") {
+        const isBypassed = result.dbProtectionType?.includes('Bypassed API');
         setSecurityInspection({
           authCheck: { status: "pass", label: "Identity Verified" },
           timeVerify: { status: "pass", label: "Timestamp Verified" },
-          sqliCheck: { status: "pass", label: "No SQLi Detected" },
+          sqliCheck: isBypassed 
+            ? { status: "warn", label: "Shield Bypassed (SQLi Detected)" }
+            : { status: "pass", label: "No SQLi Detected" },
           rateLimit: { status: "pass", label: "Timing Approved" },
           rangeCheck: { status: "pass", label: "Normal Range Approved" },
           anomalyCheck: { status: "warn", label: "Telemetry Anomaly Flagged" }
@@ -146,10 +184,13 @@ export default function SimulatorPage() {
         await new Promise(r => setTimeout(r, 1000));
         setActiveStep("hospital");
       } else {
+        const isBypassed = result.dbProtectionType?.includes('Bypassed API');
         setSecurityInspection({
           authCheck: { status: "pass", label: "Identity Verified" },
           timeVerify: { status: "pass", label: "Timestamp Verified" },
-          sqliCheck: { status: "pass", label: "No SQLi Detected" },
+          sqliCheck: isBypassed 
+            ? { status: "warn", label: "Shield Bypassed (SQLi Detected)" }
+            : { status: "pass", label: "No SQLi Detected" },
           rateLimit: { status: "pass", label: "Timing Approved" },
           rangeCheck: { status: "pass", label: "Normal Range Approved" },
           anomalyCheck: { status: "pass", label: "Data Pattern Approved" }
@@ -169,34 +210,79 @@ export default function SimulatorPage() {
     setLoading(false);
   };
 
+  // Unified helper to set up request metadata and trigger flow animation
+  const triggerDeviceTelemetry = (device, rate, gateway, bypass) => {
+    const reqPayload = {
+      url: "/api/vitals",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer iomt_secure_device_secret_token_1"
+      },
+      body: {
+        deviceId: device,
+        heartRate: Number(rate),
+        gatewayId: gateway,
+        timestamp: new Date().toISOString(),
+        bypassSqliShield: bypass
+      }
+    };
+    
+    setCurrentRequest(reqPayload);
+    setActiveTab("summary"); // Reset tab to summary on new requests
+
+    animateFlow(async () => {
+      return sendDeviceData(
+        reqPayload.body.deviceId,
+        reqPayload.body.heartRate,
+        reqPayload.body.gatewayId,
+        reqPayload.body.bypassSqliShield
+      );
+    });
+  };
+
   // 1. Transmit Baseline Telemetry
   const handleSendNormal = () => {
-    animateFlow(async () => {
-      const variance = Math.floor(Math.random() * 5) - 2;
-      return sendDeviceData(deviceId, Number(heartRate) + variance, gatewayId);
-    });
+    const variance = Math.floor(Math.random() * 5) - 2;
+    triggerDeviceTelemetry(deviceId, Number(heartRate) + variance, gatewayId, bypassShield);
   };
 
   // 2. Falsified Telemetry (Spoofing)
   const handleSendSpoofing = () => {
-    animateFlow(async () => {
-      const badValues = [-5, 12, 299, 500, 999];
-      const randomBad = badValues[Math.floor(Math.random() * badValues.length)];
-      return sendDeviceData(deviceId, randomBad, gatewayId);
-    });
+    const badValues = [-5, 12, 299, 500, 999];
+    const randomBad = badValues[Math.floor(Math.random() * badValues.length)];
+    triggerDeviceTelemetry(deviceId, randomBad, gatewayId, bypassShield);
   };
 
   // 3. High-Frequency Stress Scan (DoS)
   const handleAttackDoS = async () => {
     setLoading(true);
     setFlowStatus(p => ({ ...p, wearable: "sending", edge: "sending", gateway: "sending" }));
+    
+    setCurrentRequest({
+      url: "/api/vitals (30 rapid parallel requests)",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer iomt_secure_device_secret_token_1"
+      },
+      body: {
+        deviceId: deviceId,
+        heartRate: "30 randomized packets (-50 to 450 BPM)",
+        gatewayId: gatewayId,
+        timestamp: "Sent concurrently in parallel",
+        bypassSqliShield: bypassShield
+      }
+    });
+    setActiveTab("summary");
+
     try {
       await simulateAttack(deviceId, 30);
       loadLogs();
       setCurrentResponse({ 
         status: "SCAN_COMPLETE", 
         reachedHospitalServer: false,
-        reason: "Active rate limiting isolated telemetry flood from database",
+        reason: "Active rate limiting isolated telemetry flood from database.",
         message: "High-Frequency stress scan completed. Transmitted 30 rapid packets to validate rate limiter boundaries." 
       });
     } catch (e) { console.error(e); }
@@ -205,18 +291,12 @@ export default function SimulatorPage() {
 
   // 4. Telemetry Wave Drift (Anomaly)
   const handleSendAnomaly = () => {
-    animateFlow(async () => {
-      // Sends a sudden spike to trigger moving window check
-      return sendDeviceData(deviceId, Number(heartRate) + 55, gatewayId);
-    });
+    triggerDeviceTelemetry(deviceId, Number(heartRate) + 55, gatewayId, bypassShield);
   };
 
   // 5. Database SQL Injection Payload Test
   const handleSendSQLi = () => {
-    animateFlow(async () => {
-      // Transmit a device ID containing SQL syntax
-      return sendDeviceData("DEV-IOT-102'; SELECT * FROM logs;--", Number(heartRate), gatewayId);
-    });
+    triggerDeviceTelemetry("DEV-IOT-102'; SELECT * FROM logs;--", Number(heartRate), gatewayId, bypassShield);
   };
 
   const isWearableStep = activeStep?.startsWith("wearable");
@@ -430,6 +510,28 @@ export default function SimulatorPage() {
                     <span className="text-rose-600">Bradycardia (&lt;60)</span>
                     <span className="text-emerald-600 font-bold">Normal (60-100)</span>
                     <span className="text-rose-600">Tachycardia (&gt;100)</span>
+                  </div>
+                </div>
+
+                {/* Advanced Security Sandbox controls */}
+                <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-4 shadow-sm mt-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 pr-3">
+                      <span className="text-[9px] uppercase font-bold text-blue-600 tracking-wider">Advanced Sandbox Control</span>
+                      <h4 className="text-xs font-bold text-slate-700 mt-0.5">Bypass API SQLi Shield</h4>
+                      <p className="text-[9.5px] text-slate-400 leading-snug mt-0.5">
+                        Deactivate the API regex gateway check to simulate vulnerabilities. This proves database resilience using parameterized SQL columns!
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input 
+                        type="checkbox" 
+                        checked={bypassShield} 
+                        onChange={e => setBypassShield(e.target.checked)} 
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
                 </div>
               </div>
@@ -718,29 +820,154 @@ export default function SimulatorPage() {
             </div>
 
             {currentResponse && (
-              <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-sky-50 text-sky-600">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+              <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden shadow-inner bg-slate-900 text-slate-100 font-mono text-[11px] leading-relaxed">
+                {/* Terminal Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950 border-b border-slate-800 select-none">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                    <span className="text-[10px] text-slate-500 font-sans font-semibold ml-2">HTTP / API Payload Inspector</span>
                   </div>
-                  <div className="flex-1 text-xs">
-                    <span className="font-semibold text-slate-600 block">Inspection Log</span>
-                    <p className="text-slate-500 font-mono text-[10px] mt-0.5 leading-relaxed">{currentResponse.reason || currentResponse.message}</p>
-                    <div className="flex flex-wrap items-center gap-4 mt-2 border-t border-slate-200/60 pt-2 text-[10px]">
-                      <div className="flex items-center gap-1">
-                        <span className="text-slate-400">Database Status:</span>
-                        {currentResponse.reachedHospitalServer ? (
-                          <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Saved (Safe Parameterized)</span>
-                        ) : currentResponse.dbProtectionType === 'Blocked: SQLi Prevented' ? (
-                          <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">DB Shield Blocked SQLi</span>
-                        ) : (
-                          <span className="font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">Isolated (No DB Write)</span>
-                        )}
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => setActiveTab("summary")}
+                      className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold transition-colors ${
+                        activeTab === "summary" 
+                          ? "bg-slate-800 text-sky-400 border border-slate-700" 
+                          : "text-slate-400 hover:bg-slate-900/50"
+                      }`}
+                    >
+                      Verdict Summary
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab("request")}
+                      className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold transition-colors ${
+                        activeTab === "request" 
+                          ? "bg-slate-800 text-sky-400 border border-slate-700" 
+                          : "text-slate-400 hover:bg-slate-900/50"
+                      }`}
+                    >
+                      Request Payload
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab("response")}
+                      className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold transition-colors ${
+                        activeTab === "response" 
+                          ? "bg-slate-800 text-sky-400 border border-slate-700" 
+                          : "text-slate-400 hover:bg-slate-900/50"
+                      }`}
+                    >
+                      Response Payload
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="p-4 overflow-x-auto max-h-80 select-text">
+                  {activeTab === "summary" && (
+                    <div className="space-y-3 font-sans text-slate-300">
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                          currentResponse.status === "BLOCKED" 
+                            ? "bg-rose-500/10 text-rose-400" 
+                            : currentResponse.status === "FLAGGED" 
+                              ? "bg-amber-500/10 text-amber-400" 
+                              : "bg-emerald-500/10 text-emerald-400"
+                        }`}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 text-xs">
+                          <span className="font-semibold text-slate-100 text-xs block">System Security Audit Log</span>
+                          <p className="text-slate-400 font-mono text-[10px] mt-1 leading-relaxed bg-slate-950 p-2.5 rounded border border-slate-800">
+                            {currentResponse.reason || currentResponse.message}
+                          </p>
+                          
+                          <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-slate-800 text-[10px]">
+                            <div>
+                              <span className="text-slate-500 block uppercase font-bold tracking-wider text-[8px]">Decision Status</span>
+                              <span className={`font-bold inline-block mt-0.5 ${
+                                currentResponse.status === "BLOCKED" 
+                                  ? "text-rose-400 font-extrabold" 
+                                  : currentResponse.status === "FLAGGED" 
+                                    ? "text-amber-400 font-extrabold" 
+                                    : "text-emerald-400 font-extrabold"
+                              }`}>
+                                {currentResponse.status}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block uppercase font-bold tracking-wider text-[8px]">Database Security Shield</span>
+                              {currentResponse.reachedHospitalServer ? (
+                                <span className={`font-extrabold inline-block mt-0.5 ${
+                                  currentResponse.dbProtectionType?.includes("Bypassed") 
+                                    ? "text-amber-400 underline underline-offset-2 decoration-amber-500/50 animate-pulse" 
+                                    : "text-emerald-400"
+                                }`}>
+                                  {currentResponse.dbProtectionType || "Safe Parameterized"}
+                                </span>
+                              ) : currentResponse.dbProtectionType === 'Blocked: SQLi Prevented' ? (
+                                <span className="font-extrabold text-rose-400 inline-block mt-0.5">Blocked: SQLi Prevented</span>
+                              ) : (
+                                <span className="font-bold text-slate-400 inline-block mt-0.5">Isolated (No DB Write)</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {activeTab === "request" && currentRequest && (
+                    <div className="font-mono text-[10px] space-y-3">
+                      <div>
+                        <span className="text-sky-400 font-bold">METHOD:</span> <span className="text-emerald-400">POST</span>
+                      </div>
+                      <div>
+                        <span className="text-sky-400 font-bold">URL:</span> <span className="text-slate-300">{currentRequest.url}</span>
+                      </div>
+                      <div>
+                        <span className="text-sky-400 font-bold">HEADERS:</span>
+                        <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 mt-1 text-slate-400 overflow-x-auto">
+{JSON.stringify(currentRequest.headers, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <span className="text-sky-400 font-bold">JSON PAYLOAD BODY:</span>
+                        <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 mt-1 text-slate-300 overflow-x-auto">
+{JSON.stringify(currentRequest.body, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === "response" && (
+                    <div className="font-mono text-[10px] space-y-3">
+                      <div>
+                        <span className="text-sky-400 font-bold">HTTP STATUS:</span> <span className={`font-bold ${
+                          currentResponse.status === "BLOCKED" ? "text-rose-400" : "text-emerald-400"
+                        }`}>{currentResponse.status === "BLOCKED" ? "400 Bad Request" : "200 OK"}</span>
+                      </div>
+                      <div>
+                        <span className="text-sky-400 font-bold">HEADERS:</span>
+                        <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 mt-1 text-slate-400 overflow-x-auto">
+{`{
+  "content-type": "application/json; charset=utf-8",
+  "x-hospital-shield-inspected": "true",
+  "x-hospital-shield-decision": "${currentResponse.status}"
+}`}
+                        </pre>
+                      </div>
+                      <div>
+                        <span className="text-sky-400 font-bold">JSON RESPONSE BODY:</span>
+                        <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 mt-1 text-emerald-300 overflow-x-auto">
+{JSON.stringify(currentResponse, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

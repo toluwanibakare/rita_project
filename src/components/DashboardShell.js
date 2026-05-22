@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { isAuthenticated } from "@/lib/auth";
 import { fetchLogs } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function DashboardShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,31 +28,48 @@ export default function DashboardShell({ children }) {
     }
   }, [pathname, isAuthPage, isHomePage]);
 
-  // A. Polling database logs to trigger alarm if new threat is detected
+  // A. Realtime database logs subscription to trigger alarm if new threat is detected
   useEffect(() => {
     if (!isAuth || isAuthPage) return;
+
+    const handleNewThreat = (log) => {
+      const isThreat = log.decision === "BLOCKED" || log.status === "BLOCKED";
+      if (isThreat && log.timestamp !== lastAckTimestamp) {
+        setAlarmActive(true);
+      }
+    };
 
     const checkEmergency = async () => {
       try {
         const res = await fetchLogs();
         const logsArray = Array.isArray(res) ? res : (res && res.logs) || [];
         if (logsArray.length > 0) {
-          const latestLog = logsArray[0];
-          // Trigger alarm if the latest log is a security block / threat mitigation
-          const isThreat = latestLog.decision === "BLOCKED" || latestLog.status === "BLOCKED";
-          
-          if (isThreat && latestLog.timestamp !== lastAckTimestamp) {
-            setAlarmActive(true);
-          }
+          handleNewThreat(logsArray[0]);
         }
       } catch (err) {
         console.error("Emergency system failed to check telemetry logs:", err);
       }
     };
 
+    // Initial check
     checkEmergency();
-    const interval = setInterval(checkEmergency, 4000);
-    return () => clearInterval(interval);
+
+    // Subscribe to realtime insert events for instantaneous threat alerting
+    const channel = supabase
+      .channel("alarm-logs")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "logs" },
+        (payload) => {
+          console.log("Emergency system real-time threat scan:", payload.new);
+          handleNewThreat(payload.new);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [isAuth, isAuthPage, lastAckTimestamp]);
 
   // B. Instant client-side alarm event listener

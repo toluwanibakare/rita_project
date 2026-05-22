@@ -5,7 +5,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
  * Sends a single device reading to the backend API.
  * The backend expects deviceId (string), heartRate (number), and a timestamp (string).
  */
-export async function sendDeviceData(deviceId, heartRate, gatewayId = 'GW-EDGE-01') {
+export async function sendDeviceData(deviceId, heartRate, gatewayId = 'GW-EDGE-01', bypassSqliShield = false) {
   const res = await fetch(`${API_BASE}/api/vitals`, {
     method: "POST",
     headers: { 
@@ -16,7 +16,8 @@ export async function sendDeviceData(deviceId, heartRate, gatewayId = 'GW-EDGE-0
       deviceId: deviceId, 
       heartRate: Number(heartRate),
       gatewayId: gatewayId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      bypassSqliShield: bypassSqliShield
     }),
   });
   return res.json();

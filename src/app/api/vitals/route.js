@@ -25,7 +25,7 @@ export async function POST(request) {
   try {
     // 1. Parse the incoming JSON payload
     const body = await request.json();
-    const { deviceId, heartRate, timestamp, gatewayId } = body;
+    const { deviceId, heartRate, timestamp, gatewayId, bypassSqliShield } = body;
 
     // Validate that the required fields are present and of the correct type
     if (!deviceId || typeof heartRate !== 'number' || !timestamp) {
@@ -122,14 +122,22 @@ export async function POST(request) {
     // ==========================================
     // Check text inputs (deviceId & gatewayId) for hazardous SQL constructs (', --, ;, UNION, SELECT, etc.)
     const sqlRegex = /[\'\"]|--|;|union|select|insert|update|delete|drop|or\s+1\s*=\s*1/i;
-    if (sqlRegex.test(deviceId) || (gatewayId && sqlRegex.test(gatewayId))) {
-      return await resolveRequest(
-        'BLOCKED', 
-        'Database Shield Trigger: SQL Injection patterns intercepted in gateway headers or device identifiers.', 
-        'SQLi Sanitization', 
-        false, 
-        'Blocked: SQLi Prevented'
-      );
+    const hasSqli = sqlRegex.test(deviceId) || (gatewayId && sqlRegex.test(gatewayId));
+    let isSqliBypassed = false;
+
+    if (hasSqli) {
+      if (bypassSqliShield) {
+        isSqliBypassed = true;
+        console.warn('API SHIELD BYPASSED: SQL Injection pattern allowed through to test parameterized query security.');
+      } else {
+        return await resolveRequest(
+          'BLOCKED', 
+          'Database Shield Trigger: SQL Injection patterns intercepted in gateway headers or device identifiers.', 
+          'SQLi Sanitization', 
+          false, 
+          'Blocked: SQLi Prevented'
+        );
+      }
     }
 
     // ==========================================
@@ -170,7 +178,13 @@ export async function POST(request) {
     const reachedHospital = true;
     const finalStage = outcomeStatus === 'NORMAL' ? 'Hospital Server' : 'Anomaly Detection';
 
-    return await resolveRequest(outcomeStatus, outcomeReason, finalStage, reachedHospital);
+    return await resolveRequest(
+      outcomeStatus, 
+      isSqliBypassed ? 'Telemetry processed despite SQLi constructs; saved securely by DB parameterization.' : outcomeReason, 
+      finalStage, 
+      reachedHospital,
+      isSqliBypassed ? 'Safe Parameterized (Bypassed API)' : null
+    );
     
   } catch (error) {
     // Catch-all for any unexpected errors (e.g., malformed JSON)

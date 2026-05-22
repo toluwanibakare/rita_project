@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { fetchLogs } from "@/lib/api";
 import RequestTable from "@/components/RequestTable";
 
@@ -19,9 +20,41 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    // 1. Initial load
     loadLogs();
-    const interval = setInterval(loadLogs, 5000);
-    return () => clearInterval(interval);
+
+    // 2. Real-time Subscription
+    const channel = supabase
+      .channel("monitoring-logs")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "logs" },
+        (payload) => {
+          // Prepend new row instantly for absolute real-time responsiveness
+          setLogs((prev) => {
+            const exists = prev.some(
+              (log) => 
+                log.timestamp === payload.new.timestamp && 
+                log.deviceId === payload.new.deviceId
+            );
+            if (exists) return prev;
+
+            const formattedLog = {
+              ...payload.new,
+              heartRate: Number(payload.new.heartRate)
+            };
+            return [formattedLog, ...prev].slice(0, 50);
+          });
+
+          // Quietly update from API gateway to ensure robust merging/consistency
+          loadLogs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (
@@ -34,7 +67,7 @@ export default function DashboardPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-600" />
             </span>
-            Auto-refreshing every 5s
+            Real-time updates active
           </div>
           <span className="text-xs text-slate-500">{logs.length} records</span>
         </div>
