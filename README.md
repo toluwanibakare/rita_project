@@ -1,4 +1,4 @@
-# 🛡️ IoMT Shield: Secure Real-Time Telemetry & Database Protection Gateway
+# IoMT Shield: Secure Real-Time Telemetry & Database Protection Gateway
 
 Welcome to **IoMT Shield** (Project RITA), an advanced, enterprise-grade Internet of Medical Things (IoMT) security monitoring system and telemetry gateway. 
 
@@ -6,7 +6,7 @@ This platform demonstrates a complete **Defense-in-Depth** security framework. I
 
 ---
 
-## 📖 System Overview: What the Project Does
+## System Overview: What the Project Does
 
 IoMT Shield simulates a secure hospital infrastructure where clinical wearable devices continuously stream critical health vitals over edge networks to central databases. 
 
@@ -18,7 +18,7 @@ In healthcare systems, compromised devices or edge gateways can transmit malicio
 
 ---
 
-## 🏗️ System Architecture & Data Flow
+## System Architecture & Data Flow
 
 The platform is designed around a three-tier decoupled architecture: **Device Telemetry Source (Frontend Simulator)**, **API Gateways & Processing Logic (Backend)**, and the **Committed Storage Engine (Database)**.
 
@@ -56,7 +56,7 @@ sequenceDiagram
 
 ---
 
-## 🛠️ Technology Stack & Environment
+## Technology Stack & Environment
 
 | Component | Technology | Rationale & Purpose |
 | :--- | :--- | :--- |
@@ -68,7 +68,7 @@ sequenceDiagram
 
 ---
 
-## 🛡️ The 6-Layer Security Inspection Shield
+## The 6-Layer Security Inspection Shield
 
 Every incoming payload processed by the backend API at `/api/vitals` is passed through six defensive filters:
 
@@ -83,7 +83,7 @@ Every incoming payload processed by the backend API at `/api/vitals` is passed t
 
 ---
 
-## 📝 Data Processing Journey: Step-by-Step Flow
+## Data Processing Journey: Step-by-Step Flow
 
 ### 1. Telemetry Capture & Serialization
 A wearable device or frontend simulator serializes the physiological parameters and client metadata into a JSON structure, signing it with the edge device's security token:
@@ -124,7 +124,7 @@ The frontend client dashboard, listening to the websocket channel, catches the b
 
 ---
 
-## 💻 Technical Code Snippets: How It Works
+## Technical Code Snippets: How It Works
 
 ### Backend Telemetry Processing & Parameterized Writing
 *Excerpt from [src/app/api/vitals/route.js](file:///c:/Users/DELL/Documents/GitHub/rita_project/src/app/api/vitals/route.js)*
@@ -211,7 +211,7 @@ useEffect(() => {
 
 ---
 
-## 🗄️ Database Schema & SQL DDL
+## Database Schema & SQL DDL
 
 Paste the following SQL directly into your Supabase SQL Editor to provision the tracking tables, set index tables, configure access policies, and enable real-time replication channels:
 
@@ -254,7 +254,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.logs;
 
 ---
 
-## 🚀 Setup & Execution Guide
+## Setup & Execution Guide
 
 Follow these steps to deploy the application locally:
 
