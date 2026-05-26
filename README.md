@@ -4,6 +4,14 @@ Welcome to **IoMT Shield** (Project RITA), an advanced, enterprise-grade Interne
 
 This platform demonstrates a complete **Defense-in-Depth** security framework. It secures physiological patient telemetry (such as live heart rates) from spoofing, replay attacks, and database exploits, featuring a fully interactive real-time simulation suite.
 
+### 🚨 A Medical Cyber-Security Nightmare Scenario
+
+Imagine an ICU department in a modern hospital. Dozens of patients depend on wireless Internet of Medical Things (IoMT) electrocardiograms to stream vitals directly to the central clinical station. An attacker compromises an edge node and injects malicious telemetry data—or worse, executes a database command payload designed to drop clinical logging tables.
+
+If the gateway is vulnerable, the database drops, monitoring halts, and clinical personnel are left blind.
+
+**IoMT Shield** is built specifically to demonstrate how modern cloud architecture, parameterized queries, and defensive filters mitigate these attacks, securing patient safety and maintaining absolute operational visibility.
+
 ---
 
 ## System Overview: What the Project Does
@@ -16,11 +24,46 @@ In healthcare systems, compromised devices or edge gateways can transmit malicio
 3. **Database Safeguards (Prepared Statements):** Demonstrates that even if the API shield is bypassed (simulating a zero-day validation exploit), the PostgreSQL database remains completely immune to command injections because of parameterized query parsing.
 4. **Instant WebSocket Sync:** Displays telemetry logs, audit statuses, and system-wide caution warnings in a sleek, glassmorphic dashboard in real-time, eliminating sluggish manual refreshes.
 
+> [!IMPORTANT]
+> The primary focus of this project is **Defense-in-Depth**. Evasion of one layer (such as the regex validator bypass) should never lead to complete compromise. Parameterized database binding serves as the ultimate fallback safeguard.
+
 ---
 
 ## System Architecture & Data Flow
 
 The platform is designed around a three-tier decoupled architecture: **Device Telemetry Source (Frontend Simulator)**, **API Gateways & Processing Logic (Backend)**, and the **Committed Storage Engine (Database)**.
+
+```
++----------------------------------+
+|      IoMT Wearable Devices       |  <--- Emits heart rate telemetry
++----------------------------------+
+                 |
+                 v   (Bearer auth Token + Client Timestamp check)
++----------------------------------+
+|       Edge Gateway Router        |  <--- Encrypts & packages payload
++----------------------------------+
+                 |
+                 v   (Next.js REST POST /api/vitals)
++----------------------------------+
+|    Multi-Layer Security Shield   |  <--- IAM, Replay Check, SQLi regex,
+|      (Next.js API Gateway)       |       Rate Limiting, Medical Range,
++----------------------------------+       Lightweight Anomaly detection
+                 |
+                 +-------------------+
+                 |                   |  (Committed via
+                 | (If Passed)       |   Parameterized Queries)
+                 v                   v
+        +------------------+   +------------------+
+        |   Fallback Local |   |  Secure Hospital |
+        |   In-Memory Store|   |  Supabase DB     |  <--- Immune to SQLi
+        +------------------+   +------------------+
+                                     |
+                                     v  (WebSockets postgres_changes INSERT)
+                               +------------------+
+                               | React Dashboard  |  <--- Real-time Logs UI
+                               | (Real-time Sync) |       & Global Alarm Warning
+                               +------------------+
+```
 
 ```mermaid
 sequenceDiagram
@@ -81,6 +124,23 @@ Every incoming payload processed by the backend API at `/api/vitals` is passed t
 | **Layer 2** | **Medical Range Validation** | Enforces clinical bounds for human survival, rejecting heart rates outside `30 - 220 BPM`. | Mitigates data injection attacks reporting invalid physiological readings. |
 | **Layer 3** | **Heuristic Anomaly Scanner** | Calculates running mathematical moving averages (5-packet buffer) and flags deviations $> 40$ BPM. | Identifies sudden telemetry drift suggesting device tempering. |
 
+> [!TIP]
+> For high-reliability clinical environments, executing defensive checks in order of compute cost (IAM & Time drift first, expensive regex parses and database queries last) preserves precious server compute and DB connection bandwidth under DoS attacks.
+
+---
+
+## Interactive Sandbox Console Walkthrough
+
+You can test these defensive layers live by clicking different simulation options inside the **Device Simulator** console:
+
+1. **Baseline Telemetry (Normal Signs):** Streams standard vitals (e.g. 70-75 BPM). This clears all validation barriers, logs the transaction as `NORMAL`, and commits to the database with a green `Parameterized Query (Safe)` badge.
+2. **Out-of-Bounds Test (Medical Spoofing):** Sends an impossible heart rate reading (e.g. 500 BPM). The packet is successfully parsed but is instantly blocked at **Layer 2 (Medical Range Validation)**, keeping unrealistic clinical data out of our medical records.
+3. **High-Frequency Stress (DoS Simulation):** Concurrent floods of 30 parallel packets are fired instantly. The gateway processes the first request and enforces **Layer 1 (Rate Limiting)** on subsequent packets, throttling the flood and keeping the database pool safe.
+4. **Telemetry Drift (Statistical Anomaly):** Simulates sudden physiological drift by introducing a spike (+55 BPM). The heuristical ML algorithm computes the drift delta and labels the write as `FLAGGED` to alert nurses.
+5. **Database SQL Injection Probe (Exploit):** Inject a malicious SQL payload (`DEV-IOT-102 SELECT...`).
+   - **Shield Active (Default):** The gateway intercepts the transaction at **Layer 0.8 (SQLi Gate)**, instantly returning an `HTTP 400 Bad Request`.
+   - **Shield Bypassed (Toggle ON):** Simulates a zero-day gateway vulnerability. The packet skips regex filtering and reaches PostgreSQL. Thanks to **parameterized DB statements**, the server isolates the SQL code and saves the query *strictly as literal text*, rendering the attack totally harmless.
+
 ---
 
 ## Data Processing Journey: Step-by-Step Flow
@@ -115,6 +175,9 @@ INSERT INTO public.logs ("deviceId", "heartRate", "decision") VALUES ($1, $2, $3
 -- The Postgres compiler binds $1 to "DEV-IOT-102'; SELECT * FROM users;--" and treats it strictly as safe LITERAL TEXT data.
 ```
 Because of this separation, the injection script is stored safely as harmless text inside the database and never executed as SQL commands.
+
+> [!NOTE]
+> Parameterized queries prevent SQLi because the PostgreSQL server compiles the SQL command structure *separately* from the user inputs. The bound parameters are treated strictly as data literals rather than executable commands, rendering SQL injection vectors completely benign.
 
 ### 5. WebSocket Event Broadcast
 The PostgreSQL database writes the new log record. Because RLS is configured and Realtime replication is enabled, the Supabase server immediately broadcasts a live `INSERT` event over active WebSockets.
