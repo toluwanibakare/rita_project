@@ -33,7 +33,7 @@ sequenceDiagram
     rect rgb(240, 248, 255)
         note right of Device: Case A: Normal Attack (Shield Active)
         Device->>FE: Trigger SQLi Probe Payload
-        FE->>API: POST /api/vitals (deviceId: "DEV-IOT-102'; SELECT...")
+        FE->>API: POST /api/vitals (deviceId: "DEV-IOT-102 SELECT...")
         note over API: Layer 0.8: regex.test(deviceId) -> TRUE
         API-->>FE: HTTP 400 Bad Request (Blocked: SQLi Prevented)
         FE->>FE: Draw "Blocked: SQLi Prevented" on Checklist
@@ -43,10 +43,10 @@ sequenceDiagram
         note right of Device: Case B: Advanced Attack (Shield Bypassed)
         FE->>FE: Enable "Bypass API SQLi Shield" Toggle
         Device->>FE: Trigger SQLi Probe Payload
-        FE->>API: POST /api/vitals (deviceId: "DEV-IOT-102'; SELECT...", bypassSqliShield: true)
+        FE->>API: POST /api/vitals (deviceId: "DEV-IOT-102 SELECT...", bypassSqliShield: true)
         note over API: Layer 0.8: bypassSqliShield is TRUE -> Skip regex block
-        API->>DB: insert({ deviceId: "DEV-IOT-102'; SELECT...", ... })
-        note over DB: Executes: INSERT INTO logs ("deviceId") VALUES ($1)<br/>where $1 = "DEV-IOT-102'; SELECT..."
+        API->>DB: insert({ deviceId: "DEV-IOT-102 SELECT...", ... })
+        note over DB: Executes: INSERT INTO logs ("deviceId") VALUES ($1)<br/>where $1 = "DEV-IOT-102 SELECT..."
         note over DB: Database Parameterization treats $1 strictly as text.<br/>Semicolons/commands are never executed!
         DB-->>API: 201 Created (Safe text row inserted successfully)
         API-->>FE: HTTP 200 OK (Status: NORMAL, dbProtectionType: "Safe Parameterized (Bypassed API)")
