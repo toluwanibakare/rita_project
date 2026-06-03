@@ -301,7 +301,7 @@ export default function SimulatorPage() {
         [`    Heart rate value:   ${hr} BPM`, "default"],
         ["    Acceptable range:  30 - 220 BPM (Human survival limits)", "dim"],
       ]},
-      { key: "anomaly", num: 6, name: "Anomaly Detection (ML Baseline Heuristics)", lines: [
+      { key: "anomaly", num: 6, name: "Anomaly Detection (Statistical Baseline Analysis)", lines: [
         ["    Comparing reading against device historical rolling average...", "default"],
         ["    Anomaly threshold: +/- 40 BPM delta from baseline", "dim"],
       ]},
