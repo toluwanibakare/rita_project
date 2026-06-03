@@ -14,125 +14,74 @@ const COLOR_MAP = {
   info:    "text-sky-400",
   dim:     "text-slate-600",
   bright:  "text-slate-100",
+  input:   "text-emerald-300",
+  prompt:  "text-yellow-400",
 };
 
-// ─── Preset scenarios ──────────────────────────────────────────────
-const PRESETS = [
-  {
-    label: "Normal Telemetry",
-    desc: "Valid baseline vitals",
-    dot: "bg-emerald-500",
-    border: "border-emerald-500/30 hover:border-emerald-400/60",
-    text: "text-emerald-400",
-    config: {
-      deviceId: "DEV-IOT-102",
-      heartRate: 72,
-      gatewayId: "GW-EDGE-01",
-      authToken: "Bearer iomt_secure_device_secret_token_1",
-      timeMode: "current",
-      bypassShield: false,
-    },
+// ─── Quick-run command presets ──────────────────────────────────────
+const COMMANDS = {
+  normal: {
+    label: "Normal baseline telemetry",
+    config: { deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
   },
-  {
-    label: "SQL Injection",
-    desc: "Inject SQL into Device ID",
-    dot: "bg-rose-500",
-    border: "border-rose-500/30 hover:border-rose-400/60",
-    text: "text-rose-400",
-    config: {
-      deviceId: "DEV-IOT-102'; DROP TABLE logs;--",
-      heartRate: 72,
-      gatewayId: "GW-EDGE-01",
-      authToken: "Bearer iomt_secure_device_secret_token_1",
-      timeMode: "current",
-      bypassShield: false,
-    },
+  sqli: {
+    label: "SQL Injection attack payload",
+    config: { deviceId: "DEV-IOT-102'; DROP TABLE logs;--", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
   },
-  {
-    label: "Spoofed Vitals",
-    desc: "Out-of-range heart rate",
-    dot: "bg-orange-500",
-    border: "border-orange-500/30 hover:border-orange-400/60",
-    text: "text-orange-400",
-    config: {
-      deviceId: "DEV-IOT-102",
-      heartRate: 999,
-      gatewayId: "GW-EDGE-01",
-      authToken: "Bearer iomt_secure_device_secret_token_1",
-      timeMode: "current",
-      bypassShield: false,
-    },
+  spoof: {
+    label: "Spoofed out-of-range vitals (999 BPM)",
+    config: { deviceId: "DEV-IOT-102", heartRate: 999, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
   },
-  {
-    label: "Replay Attack",
-    desc: "Timestamp 10 min old",
-    dot: "bg-purple-500",
-    border: "border-purple-500/30 hover:border-purple-400/60",
-    text: "text-purple-400",
-    config: {
-      deviceId: "DEV-IOT-102",
-      heartRate: 72,
-      gatewayId: "GW-EDGE-01",
-      authToken: "Bearer iomt_secure_device_secret_token_1",
-      timeMode: "replay",
-      bypassShield: false,
-    },
+  replay: {
+    label: "Replay attack (10-minute-old timestamp)",
+    config: { deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "replay", bypassShield: false },
   },
-  {
-    label: "Invalid Auth",
-    desc: "Bad authorization token",
-    dot: "bg-red-500",
-    border: "border-red-500/30 hover:border-red-400/60",
-    text: "text-red-400",
-    config: {
-      deviceId: "DEV-IOT-102",
-      heartRate: 72,
-      gatewayId: "GW-EDGE-01",
-      authToken: "Bearer INVALID_TOKEN",
-      timeMode: "current",
-      bypassShield: false,
-    },
+  badauth: {
+    label: "Invalid authorization token",
+    config: { deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer INVALID_TOKEN_12345", timeMode: "current", bypassShield: false },
   },
-  {
-    label: "Anomaly Drift",
-    desc: "Sudden delta deviation",
-    dot: "bg-amber-500",
-    border: "border-amber-500/30 hover:border-amber-400/60",
-    text: "text-amber-400",
-    config: {
-      deviceId: "DEV-IOT-102",
-      heartRate: 127,
-      gatewayId: "GW-EDGE-01",
-      authToken: "Bearer iomt_secure_device_secret_token_1",
-      timeMode: "current",
-      bypassShield: false,
-    },
+  anomaly: {
+    label: "Anomaly drift (sudden 127 BPM spike)",
+    config: { deviceId: "DEV-IOT-102", heartRate: 127, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
   },
-];
+  bypass: {
+    label: "SQL Injection with shield bypassed",
+    config: { deviceId: "DEV-IOT-102'; SELECT * FROM logs;--", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: true },
+  },
+};
 
 // ═══════════════════════════════════════════════════════════════════
-//  SIMULATOR PAGE — Terminal Console
+//  SIMULATOR PAGE — Full Interactive Terminal
 // ═══════════════════════════════════════════════════════════════════
 export default function SimulatorPage() {
-  // ── Form state ──────────────────────────────────────────────────
-  const [deviceId, setDeviceId] = useState("DEV-IOT-102");
-  const [heartRate, setHeartRate] = useState(72);
-  const [gatewayId, setGatewayId] = useState("GW-EDGE-01");
-  const [authToken, setAuthToken] = useState("Bearer iomt_secure_device_secret_token_1");
-  const [timeMode, setTimeMode] = useState("current");
-  const [bypassShield, setBypassShield] = useState(false);
-
-  // ── Console state ───────────────────────────────────────────────
   const [lines, setLines] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [txCount, setTxCount] = useState(0);
+  const [phase, setPhase] = useState("boot"); // boot | idle | prompt_device | prompt_hr | prompt_gateway | prompt_token | prompt_ts | prompt_bypass | running
+  const [inputValue, setInputValue] = useState("");
 
   const bottomRef = useRef(null);
+  const inputRef = useRef(null);
+  const configRef = useRef({
+    deviceId: "DEV-IOT-102",
+    heartRate: 72,
+    gatewayId: "GW-EDGE-01",
+    authToken: "Bearer iomt_secure_device_secret_token_1",
+    timeMode: "current",
+    bypassShield: false,
+  });
 
   // ── Auto-scroll on new lines ────────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
+
+  // ── Focus input when phase changes ──────────────────────────────
+  useEffect(() => {
+    if (phase !== "running" && phase !== "boot") {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [phase]);
 
   // ── Welcome message on mount ────────────────────────────────────
   useEffect(() => {
@@ -150,24 +99,25 @@ export default function SimulatorPage() {
         ["  Secure API Pipeline Simulation Console", "dim"],
         ["  ──────────────────────────────────────────────────", "dim"],
         ["", "dim"],
-        ["  Configure telemetry parameters in the control panel above,", "default"],
-        ["  then press EXECUTE to trace the complete API journey through", "default"],
-        ["  the 6-layer backend security pipeline.", "default"],
+        ["  This terminal traces the complete journey of medical", "default"],
+        ["  telemetry data through a 6-layer backend security pipeline.", "default"],
         ["", "dim"],
-        ["  Quick-fill presets are available for common attack scenarios.", "dim"],
+        ["  Type 'help' to see available commands, or press ENTER", "default"],
+        ["  to configure and transmit a custom telemetry packet.", "default"],
         ["", "dim"],
-        ["  Awaiting transmission...", "success"],
+        ["  Ready.", "success"],
         ["", "dim"],
       ];
       for (const [text, color] of welcome) {
         setLines((p) => [...p, { id: `${Date.now()}-${Math.random()}`, text, color }]);
         await new Promise((r) => setTimeout(r, 25));
       }
+      setPhase("idle");
     };
     boot();
   }, []);
 
-  // ── Background Supabase sync (keeps real-time pipeline warm) ────
+  // ── Background Supabase sync ────────────────────────────────────
   useEffect(() => {
     const channel = supabase
       .channel("simulator-console")
@@ -180,42 +130,25 @@ export default function SimulatorPage() {
   //  HELPERS
   // ═══════════════════════════════════════════════════════════════
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  // Pace multiplier for inter-line delays (reduced since typing adds its own time)
   const PACE = 1.8;
 
   const print = (text, color = "default") => {
     setLines((p) => [...p, { id: `${Date.now()}-${Math.random()}`, text, color }]);
   };
 
-  // Types text character-by-character into the console (real terminal feel)
   const typeLine = async (fullText, color = "default") => {
     if (!fullText) { print("", color); return; }
-
     const lineId = `${Date.now()}-${Math.random()}`;
     setLines((p) => [...p, { id: lineId, text: "", color }]);
-
-    const chunkSize = 3;  // characters revealed per tick
-    const charDelay = 12; // ms per tick
-
+    const chunkSize = 3;
     for (let i = chunkSize; i < fullText.length; i += chunkSize) {
-      await sleep(charDelay);
+      await sleep(12);
       const partial = fullText.substring(0, i);
-      setLines((p) => {
-        const arr = [...p];
-        arr[arr.length - 1] = { ...arr[arr.length - 1], text: partial };
-        return arr;
-      });
+      setLines((p) => { const a = [...p]; a[a.length - 1] = { ...a[a.length - 1], text: partial }; return a; });
     }
-    // Ensure full text is rendered
-    setLines((p) => {
-      const arr = [...p];
-      arr[arr.length - 1] = { ...arr[arr.length - 1], text: fullText };
-      return arr;
-    });
+    setLines((p) => { const a = [...p]; a[a.length - 1] = { ...a[a.length - 1], text: fullText }; return a; });
   };
 
-  // Returns true for lines that should appear instantly (separators, empty, braces)
   const isInstantLine = (text) => {
     const t = text.trim();
     if (!t) return true;
@@ -224,25 +157,17 @@ export default function SimulatorPage() {
     return false;
   };
 
-  // Prints lines — content lines type character-by-character, decorative lines appear instantly
   const printBatch = async (batch, delay = 55) => {
     for (const item of batch) {
       const [text, color] = Array.isArray(item) ? item : [item, "default"];
       const c = color || "default";
-
-      if (isInstantLine(text)) {
-        print(text, c);
-      } else {
-        await typeLine(text, c);
-      }
+      if (isInstantLine(text)) { print(text, c); } else { await typeLine(text, c); }
       const jitter = Math.random() * 60;
       if (delay > 0) await sleep(delay * PACE + jitter);
     }
   };
 
-  // Longer pauses between major sections (simulates processing)
   const pause = (ms) => sleep(ms * PACE + Math.random() * 200);
-
   const clearConsole = () => setLines([]);
 
   const statusColor = (s) => {
@@ -260,419 +185,433 @@ export default function SimulatorPage() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  EXECUTE TRANSMISSION — The core function
+  //  EXECUTE TRANSMISSION (same core pipeline output)
   // ═══════════════════════════════════════════════════════════════
-  const executeTransmission = async (overrides = {}) => {
-    if (isRunning) return;
+  const runTransmission = async (config) => {
     setIsRunning(true);
-
+    setPhase("running");
     const num = txCount + 1;
     setTxCount(num);
 
-    // Resolve values (overrides take precedence for preset calls)
-    const dev = overrides.deviceId ?? deviceId;
-    const hr = overrides.heartRate ?? heartRate;
-    const gw = overrides.gatewayId ?? gatewayId;
-    const token = overrides.authToken ?? authToken;
-    const tm = overrides.timeMode ?? timeMode;
-    const bypass = overrides.bypassShield ?? bypassShield;
+    const { deviceId: dev, heartRate: hr, gatewayId: gw, authToken: token, timeMode: tm, bypassShield: bypass } = config;
 
     const now = new Date();
     let finalTimestamp = now.toISOString();
     let timeDesc = "Current server time (valid)";
+    if (tm === "replay") { finalTimestamp = new Date(Date.now() - 600000).toISOString(); timeDesc = "Replayed packet (10 minutes old)"; }
+    else if (tm === "future") { finalTimestamp = new Date(Date.now() + 600000).toISOString(); timeDesc = "Future clock drift (10 minutes ahead)"; }
+    else if (tm === "invalid") { finalTimestamp = "INVALID_TIMESTAMP_FORMAT"; timeDesc = "Malformed timestamp string"; }
 
-    if (tm === "replay") {
-      finalTimestamp = new Date(Date.now() - 600000).toISOString();
-      timeDesc = "Replayed packet (10 minutes old)";
-    } else if (tm === "future") {
-      finalTimestamp = new Date(Date.now() + 600000).toISOString();
-      timeDesc = "Future clock drift (10 minutes ahead)";
-    } else if (tm === "invalid") {
-      finalTimestamp = "INVALID_TIMESTAMP_FORMAT";
-      timeDesc = "Malformed timestamp string";
-    }
+    // ── BANNER ──
+    await printBatch([["", "dim"], ["", "dim"],
+      ["  =======================================================================", "dim"],
+      [`   RITA SECURITY PIPELINE  —  TRANSMISSION #${num}`, "header"],
+      [`   ${now.toISOString().replace("T", " ").slice(0, 23)} UTC`, "info"],
+      ["  =======================================================================", "dim"],
+    ], 35);
 
-    // ── BANNER ────────────────────────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["", "dim"],
-        ["  =======================================================================", "dim"],
-        [`   RITA SECURITY PIPELINE  —  TRANSMISSION #${num}`, "header"],
-        [`   ${now.toISOString().replace("T", " ").slice(0, 23)} UTC`, "info"],
-        ["  =======================================================================", "dim"],
-      ],
-      35
-    );
+    // ── STEP 1 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 1] WEARABLE DEVICE  —  BIOMETRIC COLLECTION", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      [`    Device ID:      ${dev}`, "bright"],
+      [`    Heart Rate:     ${hr} BPM`, "bright"],
+      [`    Gateway Node:   ${gw}`, "bright"],
+      [`    Reading Time:   ${finalTimestamp}`, "default"],
+      [`    Time Mode:      ${timeDesc}`, "dim"],
+      ["", "dim"],
+      ["    >>> Biometric reading captured from IoMT wearable sensor", "success"],
+    ], 55);
+    await pause(200);
 
-    // ── STEP 1: DEVICE COLLECTION ─────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  [STEP 1] WEARABLE DEVICE  —  BIOMETRIC COLLECTION", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-        [`    Device ID:      ${dev}`, "bright"],
-        [`    Heart Rate:     ${hr} BPM`, "bright"],
-        [`    Gateway Node:   ${gw}`, "bright"],
-        [`    Reading Time:   ${finalTimestamp}`, "default"],
-        [`    Time Mode:      ${timeDesc}`, "dim"],
-        ["", "dim"],
-        ["    >>> Biometric reading captured from IoMT wearable sensor", "success"],
-      ],
-      55
-    );
-    await pause(250);
+    // ── STEP 2 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 2] EDGE GATEWAY  —  NETWORK FORWARDING", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      [`    Source:          ${dev} @ Local Network`, "default"],
+      [`    Edge Router:     ${gw}`, "default"],
+      ["    Destination:    RITA Cloud API Gateway (/api/vitals)", "default"],
+      ["    Protocol:       HTTPS / TLS 1.3 (End-to-End Encrypted)", "default"],
+      ["", "dim"],
+      ["    >>> Telemetry packet encrypted and forwarded to cloud endpoint", "success"],
+    ], 55);
+    await pause(200);
 
-    // ── STEP 2: EDGE GATEWAY ──────────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  [STEP 2] EDGE GATEWAY  —  NETWORK FORWARDING", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-        [`    Source:          ${dev} @ Local Network`, "default"],
-        [`    Edge Router:     ${gw}`, "default"],
-        ["    Destination:    RITA Cloud API Gateway (/api/vitals)", "default"],
-        ["    Protocol:       HTTPS / TLS 1.3 (End-to-End Encrypted)", "default"],
-        ["", "dim"],
-        ["    >>> Telemetry packet encrypted and forwarded to cloud endpoint", "success"],
-      ],
-      55
-    );
-    await pause(250);
-
-    // ── STEP 3: HTTP REQUEST ──────────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  [STEP 3] HTTP REQUEST  —  DISPATCH TO BACKEND", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-        ["", "dim"],
-        ["    POST /api/vitals HTTP/1.1", "info"],
-        ["    Host: rita-gateway.vercel.app", "dim"],
-        [`    Authorization: ${token}`, "dim"],
-        ["    Content-Type: application/json", "dim"],
-        ["", "dim"],
-        ["    Request Body:", "default"],
-        ["    {", "bright"],
-        [`      "deviceId": "${dev}",`, "bright"],
-        [`      "heartRate": ${hr},`, "bright"],
-        [`      "gatewayId": "${gw}",`, "bright"],
-        [`      "timestamp": "${finalTimestamp}",`, "bright"],
-        [`      "bypassSqliShield": ${bypass}`, "bright"],
-        ["    }", "bright"],
-        ["", "dim"],
-        ["    >>> Request dispatched to Next.js API route handler...", "info"],
-      ],
-      40
-    );
-    await pause(500);
-
-    // ── STEP 4: SECURITY PIPELINE ─────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  [STEP 4] BACKEND SECURITY PIPELINE  —  6-LAYER VERIFICATION", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-        ["    Request received by server. Initializing security layers...", "default"],
-      ],
-      55
-    );
+    // ── STEP 3 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 3] HTTP REQUEST  —  DISPATCH TO BACKEND", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      ["", "dim"],
+      ["    POST /api/vitals HTTP/1.1", "info"],
+      ["    Host: rita-gateway.vercel.app", "dim"],
+      [`    Authorization: ${token}`, "dim"],
+      ["    Content-Type: application/json", "dim"],
+      ["", "dim"],
+      ["    Request Body:", "default"],
+      ["    {", "bright"],
+      [`      "deviceId": "${dev}",`, "bright"],
+      [`      "heartRate": ${hr},`, "bright"],
+      [`      "gatewayId": "${gw}",`, "bright"],
+      [`      "timestamp": "${finalTimestamp}",`, "bright"],
+      [`      "bypassSqliShield": ${bypass}`, "bright"],
+      ["    }", "bright"],
+      ["", "dim"],
+      ["    >>> Request dispatched to Next.js API route handler...", "info"],
+    ], 40);
     await pause(400);
 
-    // Actually call the API
+    // ── STEP 4 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 4] BACKEND SECURITY PIPELINE  —  6-LAYER VERIFICATION", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      ["    Request received by server. Initializing security layers...", "default"],
+    ], 55);
+    await pause(300);
+
     let result;
     try {
       result = await sendDeviceData(dev, hr, gw, bypass, token, finalTimestamp);
     } catch (err) {
-      await printBatch([
-        ["", "dim"],
-        [`    NETWORK ERROR: ${err.message}`, "error"],
-        ["    >>> Transmission failed. Check server connection.", "error"],
-      ]);
-      setIsRunning(false);
-      return;
+      await printBatch([["", "dim"], [`    NETWORK ERROR: ${err.message}`, "error"], ["    >>> Transmission failed.", "error"]]);
+      setIsRunning(false); setPhase("idle"); return;
     }
 
     const checks = result.checks || {};
 
-    // ── Layer 1: IAM ────────────────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["    +--------------------------------------------------------------+", "dim"],
-        ["    |  LAYER 1: Identity & Access Management (IAM)                |", "info"],
-        ["    +--------------------------------------------------------------+", "dim"],
+    // Layer 1-6
+    const layerDefs = [
+      { key: "auth", num: 1, name: "Identity & Access Management (IAM)", lines: [
         ["    Validating Authorization bearer token...", "default"],
         [`    Token: ${token ? token.substring(0, 40) + (token.length > 40 ? "..." : "") : "(empty)"}`, "dim"],
-      ],
-      65
-    );
-    await pause(150);
-    await printBatch([
-      [`    >>> ${statusIcon(checks.auth?.status)}: ${checks.auth?.detail || "No details."}`, statusColor(checks.auth?.status)],
-    ], 0);
-    await pause(250);
-
-    // ── Layer 2: Anti-Replay ────────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["    +--------------------------------------------------------------+", "dim"],
-        ["    |  LAYER 2: Anti-Replay Protection (Timestamp Validation)     |", "info"],
-        ["    +--------------------------------------------------------------+", "dim"],
+      ]},
+      { key: "timestamp", num: 2, name: "Anti-Replay Protection (Timestamp Validation)", lines: [
         [`    Client timestamp:  ${finalTimestamp}`, "default"],
         [`    Server timestamp:  ${new Date().toISOString()}`, "default"],
-      ],
-      65
-    );
-    await pause(150);
-    await printBatch([
-      [`    >>> ${statusIcon(checks.timestamp?.status)}: ${checks.timestamp?.detail || "No details."}`, statusColor(checks.timestamp?.status)],
-    ], 0);
-    await pause(250);
-
-    // ── Layer 3: SQL Injection ──────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["    +--------------------------------------------------------------+", "dim"],
-        ["    |  LAYER 3: SQL Injection Shield (Input Sanitization)          |", "info"],
-        ["    +--------------------------------------------------------------+", "dim"],
+      ]},
+      { key: "sqli", num: 3, name: "SQL Injection Shield (Input Sanitization)", lines: [
         [`    Scanning deviceId:  "${dev}"`, "default"],
         [`    Scanning gatewayId: "${gw}"`, "default"],
-        ["    Regex pattern:     /['\\\"]|--|;|union|select|insert|drop|or\\s+1\\s*=\\s*1/i", "dim"],
-      ],
-      65
-    );
-    await pause(150);
-    await printBatch([
-      [`    >>> ${statusIcon(checks.sqli?.status)}: ${checks.sqli?.detail || "No details."}`, statusColor(checks.sqli?.status)],
-    ], 0);
-    await pause(250);
-
-    // ── Layer 4: Rate Limiter ───────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["    +--------------------------------------------------------------+", "dim"],
-        ["    |  LAYER 4: Rate Limiter (DoS Flood Prevention)               |", "info"],
-        ["    +--------------------------------------------------------------+", "dim"],
+        ["    Regex: /['\\\"]|--|;|union|select|insert|drop|or\\s+1\\s*=\\s*1/i", "dim"],
+      ]},
+      { key: "rateLimit", num: 4, name: "Rate Limiter (DoS Flood Prevention)", lines: [
         ["    Checking request frequency against per-device rate limit...", "default"],
         ["    Minimum interval: 800ms between consecutive writes", "dim"],
-      ],
-      65
-    );
-    await pause(150);
-    await printBatch([
-      [`    >>> ${statusIcon(checks.rateLimit?.status)}: ${checks.rateLimit?.detail || "No details."}`, statusColor(checks.rateLimit?.status)],
-    ], 0);
-    await pause(250);
-
-    // ── Layer 5: Medical Range ──────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["    +--------------------------------------------------------------+", "dim"],
-        ["    |  LAYER 5: Medical Range Validation (Spoofing Detection)      |", "info"],
-        ["    +--------------------------------------------------------------+", "dim"],
+      ]},
+      { key: "range", num: 5, name: "Medical Range Validation (Spoofing Detection)", lines: [
         [`    Heart rate value:   ${hr} BPM`, "default"],
         ["    Acceptable range:  30 - 220 BPM (Human survival limits)", "dim"],
-      ],
-      65
-    );
-    await pause(150);
-    await printBatch([
-      [`    >>> ${statusIcon(checks.range?.status)}: ${checks.range?.detail || "No details."}`, statusColor(checks.range?.status)],
-    ], 0);
-    await pause(250);
-
-    // ── Layer 6: Anomaly Detection ──────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["    +--------------------------------------------------------------+", "dim"],
-        ["    |  LAYER 6: Anomaly Detection (ML Baseline Heuristics)         |", "info"],
-        ["    +--------------------------------------------------------------+", "dim"],
+      ]},
+      { key: "anomaly", num: 6, name: "Anomaly Detection (ML Baseline Heuristics)", lines: [
         ["    Comparing reading against device historical rolling average...", "default"],
         ["    Anomaly threshold: +/- 40 BPM delta from baseline", "dim"],
-      ],
-      65
-    );
-    await pause(150);
-    await printBatch([
-      [`    >>> ${statusIcon(checks.anomaly?.status)}: ${checks.anomaly?.detail || "No details."}`, statusColor(checks.anomaly?.status)],
-    ], 0);
-    await pause(350);
+      ]},
+    ];
 
-    // ── STEP 5: SQL COMPILATION ───────────────────────────────
-    await printBatch(
-      [
+    for (const layer of layerDefs) {
+      const check = checks[layer.key];
+      await printBatch([
         ["", "dim"],
-        ["  [STEP 5] DATABASE QUERY COMPILATION", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-        ["", "dim"],
-        ["    Engine:  PostgreSQL via Supabase Client SDK", "default"],
-        ["    Method:  Prepared Parameterized Statement (NOT string concatenation)", "default"],
-        ["", "dim"],
-        ["    --- VULNERABLE QUERY (String Interpolation - NOT USED) -----------", "error"],
-        [`    INSERT INTO public.logs ("deviceId","heartRate","decision")`, "error"],
-        [`    VALUES ('${dev}', ${hr}, '${result.status}');`, "error"],
-        ["    ^ User input is injected directly as executable SQL code", "dim"],
-        ["", "dim"],
-        ["    --- SECURE QUERY (Parameterized Binding - ACTIVE) ----------------", "success"],
-        ["    PREPARE stmt(text, numeric, text) AS", "success"],
-        ['    INSERT INTO public.logs ("deviceId","heartRate","decision")', "success"],
-        ["    VALUES ($1, $2, $3);", "success"],
-        ["", "dim"],
-        [`    EXECUTE stmt('${dev}', ${hr}, '${result.status}');`, "success"],
-        ["    ^ Inputs are bound as safe data literals — injection is inert", "dim"],
-      ],
-      45
-    );
-    await pause(350);
-
-    // ── STEP 6: DATABASE COMMIT ───────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  [STEP 6] DATABASE COMMIT", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-      ],
-      50
-    );
-
-    if (result.reachedHospitalServer) {
-      await printBatch(
-        [
-          ["    Table:        public.logs", "default"],
-          ["    Operation:    INSERT", "default"],
-          [`    Protection:   ${result.dbProtectionType || "Parameterized Query (Safe)"}`, "default"],
-          ["", "dim"],
-          [`    Row:  { deviceId: "${dev}", heartRate: ${hr}, decision: "${result.status}" }`, "bright"],
-          ["", "dim"],
-          ["    >>> COMMITTED SUCCESSFULLY — Record written to hospital database", "success"],
-        ],
-        55
-      );
-    } else {
-      await printBatch(
-        [
-          ["    Operation:    NONE (Write blocked by security pipeline)", "default"],
-          [`    Blocked at:   ${result.stage}`, "default"],
-          [`    Reason:       ${result.reason}`, "default"],
-          ["", "dim"],
-          ["    >>> ISOLATED — No database write executed. Threat contained.", "error"],
-        ],
-        55
-      );
+        ["    +--------------------------------------------------------------+", "dim"],
+        [`    |  LAYER ${layer.num}: ${layer.name.padEnd(50)}|`, "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ...layer.lines,
+      ], 65);
+      await pause(120);
+      await printBatch([[`    >>> ${statusIcon(check?.status)}: ${check?.detail || "No details."}`, statusColor(check?.status)]], 0);
+      await pause(200);
     }
-    await pause(350);
+    await pause(250);
 
-    // ── STEP 7: HTTP RESPONSE ─────────────────────────────────
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  [STEP 7] HTTP RESPONSE  —  RETURNED TO CLIENT", "header"],
-        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
-        ["", "dim"],
-        [
-          `    HTTP/1.1 ${result.status === "BLOCKED" ? "400 Bad Request" : "200 OK"}`,
-          result.status === "BLOCKED" ? "error" : "success",
-        ],
-        ['    x-hospital-shield-decision: "' + result.status + '"', "dim"],
-        ["", "dim"],
-        ["    Response Body:", "default"],
-        ["    {", "bright"],
-        [`      "status": "${result.status}",`, "bright"],
-        [`      "reason": "${result.reason}",`, "bright"],
-        [`      "stage": "${result.stage}",`, "bright"],
-        [`      "reachedHospitalServer": ${result.reachedHospitalServer},`, "bright"],
-        [`      "dbProtectionType": "${result.dbProtectionType || "N/A"}"`, "bright"],
-        ["    }", "bright"],
-      ],
-      40
-    );
-    await pause(350);
+    // ── STEP 5 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 5] DATABASE QUERY COMPILATION", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      ["", "dim"],
+      ["    Engine:  PostgreSQL via Supabase Client SDK", "default"],
+      ["    Method:  Prepared Parameterized Statement (NOT string concatenation)", "default"],
+      ["", "dim"],
+      ["    --- VULNERABLE QUERY (String Interpolation - NOT USED) -----------", "error"],
+      [`    INSERT INTO public.logs ("deviceId","heartRate","decision")`, "error"],
+      [`    VALUES ('${dev}', ${hr}, '${result.status}');`, "error"],
+      ["    ^ User input injected directly as executable SQL code", "dim"],
+      ["", "dim"],
+      ["    --- SECURE QUERY (Parameterized Binding - ACTIVE) ----------------", "success"],
+      ["    PREPARE stmt(text, numeric, text) AS", "success"],
+      ['    INSERT INTO public.logs ("deviceId","heartRate","decision")', "success"],
+      ["    VALUES ($1, $2, $3);", "success"],
+      ["", "dim"],
+      [`    EXECUTE stmt('${dev}', ${hr}, '${result.status}');`, "success"],
+      ["    ^ Inputs bound as safe data literals — injection is inert", "dim"],
+    ], 45);
+    await pause(300);
 
-    // ── VERDICT BANNER ────────────────────────────────────────
-    const passedCount = Object.values(checks).filter(
-      (c) => c.status === "PASSED" || c.status === "BYPASSED"
-    ).length;
+    // ── STEP 6 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 6] DATABASE COMMIT", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+    ], 50);
+    if (result.reachedHospitalServer) {
+      await printBatch([
+        ["    Table:        public.logs", "default"],
+        ["    Operation:    INSERT", "default"],
+        [`    Protection:   ${result.dbProtectionType || "Parameterized Query (Safe)"}`, "default"],
+        ["", "dim"],
+        [`    Row:  { deviceId: "${dev}", heartRate: ${hr}, decision: "${result.status}" }`, "bright"],
+        ["", "dim"],
+        ["    >>> COMMITTED SUCCESSFULLY — Record written to hospital database", "success"],
+      ], 55);
+    } else {
+      await printBatch([
+        ["    Operation:    NONE (Write blocked by security pipeline)", "default"],
+        [`    Blocked at:   ${result.stage}`, "default"],
+        [`    Reason:       ${result.reason}`, "default"],
+        ["", "dim"],
+        ["    >>> ISOLATED — No database write executed. Threat contained.", "error"],
+      ], 55);
+    }
+    await pause(300);
+
+    // ── STEP 7 ──
+    await printBatch([["", "dim"],
+      ["  [STEP 7] HTTP RESPONSE  —  RETURNED TO CLIENT", "header"],
+      ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      ["", "dim"],
+      [`    HTTP/1.1 ${result.status === "BLOCKED" ? "400 Bad Request" : "200 OK"}`, result.status === "BLOCKED" ? "error" : "success"],
+      ['    x-hospital-shield-decision: "' + result.status + '"', "dim"],
+      ["", "dim"],
+      ["    Response Body:", "default"],
+      ["    {", "bright"],
+      [`      "status": "${result.status}",`, "bright"],
+      [`      "reason": "${result.reason}",`, "bright"],
+      [`      "stage": "${result.stage}",`, "bright"],
+      [`      "reachedHospitalServer": ${result.reachedHospitalServer},`, "bright"],
+      [`      "dbProtectionType": "${result.dbProtectionType || "N/A"}"`, "bright"],
+      ["    }", "bright"],
+    ], 40);
+    await pause(250);
+
+    // ── VERDICT ──
+    const passedCount = Object.values(checks).filter((c) => c.status === "PASSED" || c.status === "BYPASSED").length;
     const totalChecks = Object.keys(checks).length;
+    const verdictColor = result.status === "BLOCKED" ? "error" : result.status === "FLAGGED" ? "warning" : "success";
+    const verdictLabel = result.status === "BLOCKED" ? "BLOCKED" : result.status === "FLAGGED" ? "FLAGGED (ALLOWED WITH WARNING)" : "APPROVED";
 
-    const verdictColor =
-      result.status === "BLOCKED" ? "error" : result.status === "FLAGGED" ? "warning" : "success";
-    const verdictLabel =
-      result.status === "BLOCKED"
-        ? "BLOCKED"
-        : result.status === "FLAGGED"
-        ? "FLAGGED (ALLOWED WITH WARNING)"
-        : "APPROVED";
+    await printBatch([["", "dim"],
+      ["  =======================================================================", "dim"],
+      [`   VERDICT:          ${verdictLabel}`, verdictColor],
+      [`   Layers Passed:    ${passedCount}/${totalChecks}`, "default"],
+      [`   Database Write:   ${result.reachedHospitalServer ? "YES (" + (result.dbProtectionType || "Parameterized") + ")" : "NO (Isolated)"}`, "default"],
+      [`   Blocked At:       ${result.status === "BLOCKED" ? result.stage : "N/A — All layers cleared"}`, result.status === "BLOCKED" ? "error" : "dim"],
+      ["  =======================================================================", "dim"],
+    ], 40);
+    await pause(200);
 
-    await printBatch(
-      [
-        ["", "dim"],
-        ["  =======================================================================", "dim"],
-        [`   VERDICT:          ${verdictLabel}`, verdictColor],
-        [`   Layers Passed:    ${passedCount}/${totalChecks}`, "default"],
-        [
-          `   Database Write:   ${result.reachedHospitalServer ? "YES (" + (result.dbProtectionType || "Parameterized") + ")" : "NO (Isolated)"}`,
-          "default",
-        ],
-        [
-          `   Blocked At:       ${result.status === "BLOCKED" ? result.stage : "N/A — All layers cleared"}`,
-          result.status === "BLOCKED" ? "error" : "dim",
-        ],
-        ["  =======================================================================", "dim"],
-        ["", "dim"],
-        ["  Awaiting next transmission...", "dim"],
-        ["", "dim"],
-      ],
-      40
-    );
+    // Return to idle
+    await printBatch([["", "dim"],
+      ["  Transmission complete. Press ENTER to start a new one, or type 'help'.", "dim"],
+      ["", "dim"],
+    ], 40);
 
     setIsRunning(false);
+    setPhase("idle");
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  PRESET HANDLER
+  //  INTERACTIVE PROMPT FLOW
   // ═══════════════════════════════════════════════════════════════
-  const DEFAULTS = {
-    deviceId: "DEV-IOT-102",
-    heartRate: 72,
-    gatewayId: "GW-EDGE-01",
-    authToken: "Bearer iomt_secure_device_secret_token_1",
-    timeMode: "current",
-    bypassShield: false,
+  const showHelp = async () => {
+    await printBatch([
+      ["", "dim"],
+      ["  ╔════════════════════════════════════════════════════════════════╗", "dim"],
+      ["  ║  AVAILABLE COMMANDS                                          ║", "info"],
+      ["  ╠════════════════════════════════════════════════════════════════╣", "dim"],
+      ["  ║                                                              ║", "dim"],
+      ["  ║  normal    Run normal baseline telemetry                     ║", "default"],
+      ["  ║  sqli      Test SQL injection attack                        ║", "default"],
+      ["  ║  spoof     Test spoofed out-of-range vitals (999 BPM)       ║", "default"],
+      ["  ║  replay    Test replay attack (10-min-old timestamp)        ║", "default"],
+      ["  ║  badauth   Test invalid authorization token                 ║", "default"],
+      ["  ║  anomaly   Test anomaly detection (high BPM spike)          ║", "default"],
+      ["  ║  bypass    SQLi with API shield bypassed                    ║", "default"],
+      ["  ║  clear     Clear the console                                ║", "default"],
+      ["  ║  help      Show this help message                           ║", "default"],
+      ["  ║                                                              ║", "dim"],
+      ["  ║  Or press ENTER to build a custom packet step-by-step.      ║", "success"],
+      ["  ║                                                              ║", "dim"],
+      ["  ╚════════════════════════════════════════════════════════════════╝", "dim"],
+      ["", "dim"],
+    ], 30);
   };
 
-  const resetForm = () => {
-    setDeviceId(DEFAULTS.deviceId);
-    setHeartRate(DEFAULTS.heartRate);
-    setGatewayId(DEFAULTS.gatewayId);
-    setAuthToken(DEFAULTS.authToken);
-    setTimeMode(DEFAULTS.timeMode);
-    setBypassShield(DEFAULTS.bypassShield);
+  const promptDevice = async () => {
+    await printBatch([["", "dim"], ["  Configure your telemetry packet:", "info"], ["", "dim"]], 40);
+    await typeLine("  Enter Device ID [DEV-IOT-102]:", "prompt");
+    setPhase("prompt_device");
   };
 
-  const runPreset = (preset) => {
-    // Temporarily show preset values in the form during execution
-    setDeviceId(preset.config.deviceId);
-    setHeartRate(preset.config.heartRate);
-    setGatewayId(preset.config.gatewayId);
-    setAuthToken(preset.config.authToken);
-    setTimeMode(preset.config.timeMode);
-    setBypassShield(preset.config.bypassShield);
-    // Execute with explicit values, then reset form to defaults after
-    executeTransmission(preset.config).then(() => resetForm());
+  const promptHR = async () => {
+    await typeLine("  Enter Heart Rate in BPM [72]:", "prompt");
+    setPhase("prompt_hr");
   };
 
-  const handleManualExecute = () => {
-    executeTransmission();
+  const promptGateway = async () => {
+    await typeLine("  Enter Gateway ID [GW-EDGE-01]:", "prompt");
+    setPhase("prompt_gateway");
+  };
+
+  const promptToken = async () => {
+    await typeLine("  Enter Auth Token [Bearer iomt_secure_device_secret_token_1]:", "prompt");
+    setPhase("prompt_token");
+  };
+
+  const promptTimestamp = async () => {
+    await printBatch([
+      ["", "dim"],
+      ["  Select Timestamp Mode:", "prompt"],
+      ["    1. Current Server Time (Valid)", "default"],
+      ["    2. Replayed Packet (10 Min Old)", "default"],
+      ["    3. Future Clock Drift (10 Min Ahead)", "default"],
+      ["    4. Malformed Format (Invalid)", "default"],
+    ], 35);
+    await typeLine("  Choose [1-4, default=1]:", "prompt");
+    setPhase("prompt_ts");
+  };
+
+  const promptBypass = async () => {
+    await typeLine("  Bypass SQLi Shield? (y/n) [n]:", "prompt");
+    setPhase("prompt_bypass");
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  //  INPUT HANDLER (the brain of the terminal)
+  // ═══════════════════════════════════════════════════════════════
+  const handleSubmit = async () => {
+    const raw = inputValue.trim();
+    setInputValue("");
+
+    switch (phase) {
+      // ── IDLE: waiting for command or Enter ──────────────────
+      case "idle": {
+        print(`  $ ${raw || ""}`, "input");
+
+        if (!raw) {
+          // Enter pressed with no command — start interactive prompts
+          configRef.current = {
+            deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01",
+            authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false,
+          };
+          await promptDevice();
+          return;
+        }
+
+        const cmd = raw.toLowerCase();
+        if (cmd === "help") { await showHelp(); return; }
+        if (cmd === "clear") { clearConsole(); return; }
+
+        if (COMMANDS[cmd]) {
+          await printBatch([["", "dim"], [`  Running preset: ${COMMANDS[cmd].label}`, "info"]], 40);
+          await runTransmission(COMMANDS[cmd].config);
+          return;
+        }
+
+        await typeLine(`  Unknown command: '${raw}'. Type 'help' for available commands.`, "error");
+        return;
+      }
+
+      // ── DEVICE ID ──────────────────────────────────────────
+      case "prompt_device": {
+        const val = raw || "DEV-IOT-102";
+        print(`  $ ${val}`, "input");
+        configRef.current.deviceId = val;
+        await promptHR();
+        return;
+      }
+
+      // ── HEART RATE ─────────────────────────────────────────
+      case "prompt_hr": {
+        const parsed = parseInt(raw);
+        if (raw && isNaN(parsed)) {
+          print(`  $ ${raw}`, "input");
+          await typeLine("  Invalid number. Please enter a numeric BPM value:", "error");
+          return; // stay in same phase
+        }
+        const val = raw ? parsed : 72;
+        print(`  $ ${val}`, "input");
+        configRef.current.heartRate = val;
+        await promptGateway();
+        return;
+      }
+
+      // ── GATEWAY ID ─────────────────────────────────────────
+      case "prompt_gateway": {
+        const val = raw || "GW-EDGE-01";
+        print(`  $ ${val}`, "input");
+        configRef.current.gatewayId = val;
+        await promptToken();
+        return;
+      }
+
+      // ── AUTH TOKEN ─────────────────────────────────────────
+      case "prompt_token": {
+        const val = raw || "Bearer iomt_secure_device_secret_token_1";
+        print(`  $ ${val}`, "input");
+        configRef.current.authToken = val;
+        await promptTimestamp();
+        return;
+      }
+
+      // ── TIMESTAMP MODE ─────────────────────────────────────
+      case "prompt_ts": {
+        const num = parseInt(raw) || 1;
+        const modes = { 1: "current", 2: "replay", 3: "future", 4: "invalid" };
+        const labels = { 1: "Current Server Time", 2: "Replayed Packet", 3: "Future Drift", 4: "Malformed" };
+        if (num < 1 || num > 4) {
+          print(`  $ ${raw}`, "input");
+          await typeLine("  Invalid choice. Enter 1, 2, 3, or 4:", "error");
+          return;
+        }
+        print(`  $ ${num} (${labels[num]})`, "input");
+        configRef.current.timeMode = modes[num];
+        await promptBypass();
+        return;
+      }
+
+      // ── BYPASS SHIELD ──────────────────────────────────────
+      case "prompt_bypass": {
+        const val = raw.toLowerCase();
+        const bypass = val === "y" || val === "yes";
+        print(`  $ ${bypass ? "yes" : "no"}`, "input");
+        configRef.current.bypassShield = bypass;
+
+        await printBatch([["", "dim"], ["  Configuration complete. Initiating transmission...", "success"], ["", "dim"]], 50);
+        await runTransmission({ ...configRef.current });
+        return;
+      }
+
+      default:
+        return;
+    }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !isRunning) handleManualExecute();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const getPlaceholder = () => {
+    switch (phase) {
+      case "idle": return "Type a command or press ENTER to begin...";
+      case "prompt_device": return "Device ID (or ENTER for default)";
+      case "prompt_hr": return "Heart rate in BPM (or ENTER for 72)";
+      case "prompt_gateway": return "Gateway ID (or ENTER for default)";
+      case "prompt_token": return "Auth token (or ENTER for default)";
+      case "prompt_ts": return "1, 2, 3, or 4 (or ENTER for 1)";
+      case "prompt_bypass": return "y or n (or ENTER for n)";
+      case "running": return "Transmission in progress...";
+      default: return "";
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════
@@ -680,169 +619,44 @@ export default function SimulatorPage() {
   // ═══════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-[#080c14] flex flex-col">
-      {/* ── CONTROL PANEL (Input Bar) ─────────────────────────── */}
-      <div className="bg-[#0d1117] border-b border-[#1c2333] px-4 py-4 shrink-0">
-        {/* Title */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-            </div>
-            <h1 className="text-sm font-bold text-slate-300 tracking-wide font-mono">
-              Telemetry Console
-            </h1>
-            <span className="text-[9px] font-mono text-slate-600 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/50">
-              v1.0.0
+      {/* ── TERMINAL HEADER ───────────────────────────────────── */}
+      <div className="bg-[#0d1117] border-b border-[#1c2333] px-4 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-rose-500/80" />
+            <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+            <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+          </div>
+          <h1 className="text-sm font-bold text-slate-300 tracking-wide font-mono">
+            Telemetry Console
+          </h1>
+          <span className="text-[9px] font-mono text-slate-600 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/50">
+            v1.0.0
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {isRunning ? (
+            <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1.5 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              TRANSMITTING...
             </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {isRunning && (
-              <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1.5 animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                TRANSMITTING...
-              </span>
-            )}
-            {!isRunning && (
-              <span className="text-[10px] font-mono text-emerald-500 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                IDLE
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Row 1: Device ID, Heart Rate, Gateway ID */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2" onKeyDown={handleKeyDown}>
-          <div>
-            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
-              Device ID
-            </label>
-            <input
-              type="text"
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-              className="w-full bg-[#161b22] border border-[#2a3040] text-emerald-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
-              placeholder="e.g. DEV-IOT-102"
-            />
-          </div>
-          <div>
-            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
-              Heart Rate (BPM)
-            </label>
-            <input
-              type="number"
-              value={heartRate}
-              onChange={(e) => setHeartRate(Number(e.target.value))}
-              className="w-full bg-[#161b22] border border-[#2a3040] text-emerald-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
-              placeholder="e.g. 72"
-            />
-          </div>
-          <div>
-            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
-              Gateway ID
-            </label>
-            <input
-              type="text"
-              value={gatewayId}
-              onChange={(e) => setGatewayId(e.target.value)}
-              className="w-full bg-[#161b22] border border-[#2a3040] text-emerald-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
-              placeholder="e.g. GW-EDGE-01"
-            />
-          </div>
-        </div>
-
-        {/* Row 2: Auth Token */}
-        <div className="mb-2" onKeyDown={handleKeyDown}>
-          <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
-            Authorization Token
-          </label>
-          <input
-            type="text"
-            value={authToken}
-            onChange={(e) => setAuthToken(e.target.value)}
-            className="w-full bg-[#161b22] border border-[#2a3040] text-amber-300/80 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
-            placeholder="Bearer ..."
-          />
-        </div>
-
-        {/* Row 3: Timestamp Mode | Bypass Toggle | Execute */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 mb-3" onKeyDown={handleKeyDown}>
-          <div className="flex-1">
-            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
-              Timestamp Mode
-            </label>
-            <select
-              value={timeMode}
-              onChange={(e) => setTimeMode(e.target.value)}
-              className="w-full bg-[#161b22] border border-[#2a3040] text-slate-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none cursor-pointer transition-colors"
-            >
-              <option value="current">Current Server Time (Valid)</option>
-              <option value="replay">Replayed Packet (10 Min Old)</option>
-              <option value="future">Future Clock Drift (10 Min Ahead)</option>
-              <option value="invalid">Malformed Format (Invalid)</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3 px-3 py-2 bg-[#161b22] border border-[#2a3040] rounded-lg shrink-0">
-            <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">
-              Bypass SQLi Shield
+          ) : (
+            <span className="text-[10px] font-mono text-emerald-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              {phase === "idle" ? "READY" : "AWAITING INPUT"}
             </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={bypassShield}
-                onChange={(e) => setBypassShield(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-500 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan-600" />
-            </label>
-          </div>
-
-          <button
-            onClick={handleManualExecute}
-            disabled={isRunning}
-            className="px-6 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] shrink-0 tracking-wider shadow-lg shadow-cyan-900/30"
-          >
-            {isRunning ? "RUNNING..." : "EXECUTE"}
-          </button>
-        </div>
-
-        {/* Row 4: Preset chips */}
-        <div className="flex flex-wrap gap-1.5">
-          <span className="text-[9px] font-mono text-slate-600 self-center mr-1">PRESETS:</span>
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => runPreset(p)}
-              disabled={isRunning}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border ${p.border} bg-[#161b22] text-[10px] font-mono font-semibold ${p.text} transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#1c2333] active:scale-[0.97]`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />
-              {p.label}
-            </button>
-          ))}
+          )}
         </div>
       </div>
 
       {/* ── CONSOLE OUTPUT ────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto bg-[#080c14] px-2 py-3 font-mono text-[11px] leading-[1.65] select-text relative">
-        {/* Scanline overlay for terminal feel */}
+      <div className="flex-1 overflow-y-auto bg-[#080c14] px-2 py-3 font-mono text-[11px] leading-[1.65] select-text relative" onClick={() => inputRef.current?.focus()}>
         <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)] z-10" />
 
         <style dangerouslySetInnerHTML={{__html: `
-          @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-          }
-          @keyframes fadeSlideIn {
-            from { opacity: 0; transform: translateY(2px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .console-line {
-            animation: fadeSlideIn 0.15s ease-out;
-          }
+          @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+          @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+          .console-line { animation: fadeSlideIn 0.15s ease-out; }
         `}} />
 
         <div className="relative z-0">
@@ -851,31 +665,39 @@ export default function SimulatorPage() {
               {line.text}
             </div>
           ))}
-          {/* Blinking cursor */}
-          <div className="flex items-center gap-0 mt-0.5">
-            <span className="text-emerald-500/70">{'>'}</span>
-            <span
-              className="inline-block w-[7px] h-[14px] bg-emerald-400/80 ml-1"
-              style={{ animation: 'blink 1s step-end infinite' }}
-            />
-          </div>
           <div ref={bottomRef} />
         </div>
       </div>
 
-      {/* ── FOOTER BAR ────────────────────────────────────────── */}
-      <div className="bg-[#0d1117] border-t border-[#1c2333] px-4 py-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <span className="text-[10px] font-mono text-slate-600">
-            {lines.length} lines | {txCount} transmission{txCount !== 1 ? "s" : ""}
-          </span>
-        </div>
-        <button
-          onClick={clearConsole}
-          className="text-[10px] font-mono text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded hover:bg-slate-800/50"
-        >
-          Clear Console
-        </button>
+      {/* ── INPUT BAR (Terminal Prompt) ────────────────────────── */}
+      <div className="bg-[#0d1117] border-t border-[#1c2333] px-4 py-2.5 flex items-center gap-2 shrink-0">
+        <span className="text-emerald-500 font-mono text-sm font-bold select-none">{'>'}</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isRunning || phase === "boot"}
+          className="flex-1 bg-transparent text-emerald-300 font-mono text-sm outline-none caret-emerald-400 placeholder-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          placeholder={getPlaceholder()}
+          autoFocus
+          autoComplete="off"
+          spellCheck="false"
+        />
+        {!isRunning && phase !== "boot" && (
+          <span className="inline-block w-[7px] h-[14px] bg-emerald-400/70" style={{ animation: 'blink 1s step-end infinite' }} />
+        )}
+      </div>
+
+      {/* ── FOOTER ────────────────────────────────────────────── */}
+      <div className="bg-[#0a0e17] border-t border-[#1c2333] px-4 py-1.5 flex items-center justify-between shrink-0">
+        <span className="text-[10px] font-mono text-slate-700">
+          {lines.length} lines | {txCount} transmission{txCount !== 1 ? "s" : ""}
+        </span>
+        <span className="text-[10px] font-mono text-slate-700">
+          Type &apos;help&apos; for commands
+        </span>
       </div>
     </div>
   );
