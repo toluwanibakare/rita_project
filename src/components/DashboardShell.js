@@ -17,7 +17,12 @@ export default function DashboardShell({ children }) {
 
   // Emergency Alarm States
   const [alarmActive, setAlarmActive] = useState(false);
-  const [lastAckTimestamp, setLastAckTimestamp] = useState(null);
+  const [lastAckTimestamp, setLastAckTimestamp] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('rita_alarm_ack_ts') || null;
+    }
+    return null;
+  });
 
   useEffect(() => {
     const authenticated = isAuthenticated();
@@ -146,11 +151,13 @@ export default function DashboardShell({ children }) {
           <button
             onClick={() => {
               setAlarmActive(false);
-              // Store timestamp of latest log so it doesn't trigger on subsequent polls
+              // Store timestamp of latest log so it doesn't trigger on subsequent polls or refreshes
               fetchLogs().then((res) => {
                 const logsArray = Array.isArray(res) ? res : (res && res.logs) || [];
                 if (logsArray.length > 0) {
-                  setLastAckTimestamp(logsArray[0].timestamp);
+                  const ts = logsArray[0].timestamp;
+                  setLastAckTimestamp(ts);
+                  try { localStorage.setItem('rita_alarm_ack_ts', ts); } catch(e) {}
                 }
               });
             }}
