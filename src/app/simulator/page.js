@@ -181,19 +181,61 @@ export default function SimulatorPage() {
   // ═══════════════════════════════════════════════════════════════
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // Pace multiplier — makes the console feel deliberate and real
-  const PACE = 2.8;
+  // Pace multiplier for inter-line delays (reduced since typing adds its own time)
+  const PACE = 1.8;
 
   const print = (text, color = "default") => {
     setLines((p) => [...p, { id: `${Date.now()}-${Math.random()}`, text, color }]);
   };
 
-  // Prints lines with deliberate pacing + random jitter for natural feel
+  // Types text character-by-character into the console (real terminal feel)
+  const typeLine = async (fullText, color = "default") => {
+    if (!fullText) { print("", color); return; }
+
+    const lineId = `${Date.now()}-${Math.random()}`;
+    setLines((p) => [...p, { id: lineId, text: "", color }]);
+
+    const chunkSize = 3;  // characters revealed per tick
+    const charDelay = 12; // ms per tick
+
+    for (let i = chunkSize; i < fullText.length; i += chunkSize) {
+      await sleep(charDelay);
+      const partial = fullText.substring(0, i);
+      setLines((p) => {
+        const arr = [...p];
+        arr[arr.length - 1] = { ...arr[arr.length - 1], text: partial };
+        return arr;
+      });
+    }
+    // Ensure full text is rendered
+    setLines((p) => {
+      const arr = [...p];
+      arr[arr.length - 1] = { ...arr[arr.length - 1], text: fullText };
+      return arr;
+    });
+  };
+
+  // Returns true for lines that should appear instantly (separators, empty, braces)
+  const isInstantLine = (text) => {
+    const t = text.trim();
+    if (!t) return true;
+    if (/^[═─+|┌┐└┘│\-\s=]+$/.test(t)) return true;
+    if (t === '{' || t === '}') return true;
+    return false;
+  };
+
+  // Prints lines — content lines type character-by-character, decorative lines appear instantly
   const printBatch = async (batch, delay = 55) => {
     for (const item of batch) {
       const [text, color] = Array.isArray(item) ? item : [item, "default"];
-      print(text, color || "default");
-      const jitter = Math.random() * 80;
+      const c = color || "default";
+
+      if (isInstantLine(text)) {
+        print(text, c);
+      } else {
+        await typeLine(text, c);
+      }
+      const jitter = Math.random() * 60;
       if (delay > 0) await sleep(delay * PACE + jitter);
     }
   };
