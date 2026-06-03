@@ -243,7 +243,7 @@ export default function SimulatorPage() {
       ["  ─────────────────────────────────────────────────────────────────────", "dim"],
       ["", "dim"],
       ["    POST /api/vitals HTTP/1.1", "info"],
-      ["    Host: rita-gateway.vercel.app", "dim"],
+      ["    Host: iomt-security.vercel.app", "dim"],
       [`    Authorization: ${token}`, "dim"],
       ["    Content-Type: application/json", "dim"],
       ["", "dim"],
