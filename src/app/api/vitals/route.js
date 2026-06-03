@@ -49,13 +49,34 @@ export async function POST(request) {
       ? now - deviceState.lastRequestTime 
       : Infinity;
 
+    // Line-by-line inspection checklist tracker
+    const checks = {
+      auth: { status: "PENDING", detail: "Awaiting inspection." },
+      timestamp: { status: "PENDING", detail: "Awaiting inspection." },
+      sqli: { status: "PENDING", detail: "Awaiting inspection." },
+      rateLimit: { status: "PENDING", detail: "Awaiting inspection." },
+      range: { status: "PENDING", detail: "Awaiting inspection." },
+      anomaly: { status: "PENDING", detail: "Awaiting inspection." }
+    };
+
     /**
      * Helper Function: resolveRequest
      * Processes the final outcome of the request, updates the device's last request time,
      * logs the event, and returns the strictly formatted JSON response.
      */
     const resolveRequest = async (status, reason, stage, reachedHospital, dbProtection = null) => {
-      deviceState.lastRequestTime = now;
+      // Only update lastRequestTime on non-IAM, non-AntiReplay failures to avoid locking rates on malicious spam
+      if (stage !== 'Authentication' && stage !== 'Timestamp Validation') {
+        deviceState.lastRequestTime = now;
+      }
+
+      // Mark all remaining PENDING checks as SKIPPED
+      Object.keys(checks).forEach(key => {
+        if (checks[key].status === "PENDING") {
+          checks[key].status = "SKIPPED";
+          checks[key].detail = "Skipped: Preceding check blocked or early-resolved the request.";
+        }
+      });
 
       // Determine database safeguard classification
       const defaultDbProtection = reachedHospital 
@@ -96,7 +117,8 @@ export async function POST(request) {
         timestamp,
         stage,
         reachedHospitalServer: reachedHospital,
-        dbProtectionType: dbProtectionStatus
+        dbProtectionType: dbProtectionStatus,
+        checks
       });
     };
 
@@ -105,7 +127,16 @@ export async function POST(request) {
     // ==========================================
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer iomt_secure_')) {
+      checks.auth = { 
+        status: "FAILED", 
+        detail: `Unauthorized: Bearer token is ${!authHeader ? 'missing' : 'invalid'}.` 
+      };
       return await resolveRequest('BLOCKED', 'Unauthorized: Invalid or missing device authorization token', 'Authentication', false);
+    } else {
+      checks.auth = { 
+        status: "PASSED", 
+        detail: "Bearer token verified successfully." 
+      };
     }
 
     // ==========================================
@@ -113,8 +144,17 @@ export async function POST(request) {
     // ==========================================
     const clientTime = new Date(timestamp).getTime();
     const timeDrift = Math.abs(Date.now() - clientTime);
-    if (timeDrift > 300000) { // 5 minutes window
+    if (isNaN(clientTime) || timeDrift > 300000) { // 5 minutes window
+      checks.timestamp = { 
+        status: "FAILED", 
+        detail: `Replay Protection Triggered: Clock drift is ${isNaN(clientTime) ? 'invalid' : (timeDrift / 1000).toFixed(1) + 's'} (Max threshold: 300s).`
+      };
       return await resolveRequest('BLOCKED', 'Anti-Replay Trigger: Data timestamp is too far in the past/future', 'Timestamp Validation', false);
+    } else {
+      checks.timestamp = { 
+        status: "PASSED", 
+        detail: `Drift is ${(timeDrift / 1000).toFixed(1)}s (Within 300s safe window).` 
+      };
     }
 
     // ==========================================
@@ -128,8 +168,17 @@ export async function POST(request) {
     if (hasSqli) {
       if (bypassSqliShield) {
         isSqliBypassed = true;
+        checks.sqli = { 
+          status: "BYPASSED", 
+          detail: "SQL Injection constructs detected, but skip filter toggled active in Sandbox." 
+        };
         console.warn('API SHIELD BYPASSED: SQL Injection pattern allowed through to test parameterized query security.');
       } else {
+        const matchingPart = sqlRegex.exec(deviceId || gatewayId)?.[0];
+        checks.sqli = { 
+          status: "FAILED", 
+          detail: `SQL Injection Pattern Detected inside parameters: '${matchingPart}'` 
+        };
         return await resolveRequest(
           'BLOCKED', 
           'Database Shield Trigger: SQL Injection patterns intercepted in gateway headers or device identifiers.', 
@@ -138,20 +187,43 @@ export async function POST(request) {
           'Blocked: SQLi Prevented'
         );
       }
+    } else {
+      checks.sqli = { 
+        status: "PASSED", 
+        detail: "No SQL injection constructs detected." 
+      };
     }
 
     // ==========================================
     // LAYER 1: RATE LIMITING (DoS Mitigation)
     // ==========================================
     if (timeSinceLast < 800) {
+      checks.rateLimit = { 
+        status: "FAILED", 
+        detail: `Rate Limit Exceeded: request arrived after only ${timeSinceLast}ms (Min threshold: 800ms).` 
+      };
       return await resolveRequest('BLOCKED', 'Rate limit exceeded: requests arriving too frequently', 'Rate Limiting', false);
+    } else {
+      checks.rateLimit = { 
+        status: "PASSED", 
+        detail: `${timeSinceLast === Infinity ? 'First write' : timeSinceLast + 'ms elapsed'} since last request (Min threshold: 800ms).` 
+      };
     }
 
     // ==========================================
     // LAYER 2: MEDICAL RANGE VALIDATION (Spoofing)
     // ==========================================
     if (heartRate < 30 || heartRate > 220) {
+      checks.range = { 
+        status: "FAILED", 
+        detail: `Physiological Bounds Violated: ${heartRate} BPM is outside biological survival limits (30-220 BPM).` 
+      };
       return await resolveRequest('BLOCKED', 'Invalid physiological value: outside human survival range (30-220 bpm)', 'Medical Range Validation', false);
+    } else {
+      checks.range = { 
+        status: "PASSED", 
+        detail: `${heartRate} BPM is within biological survival limits (30-220 BPM).` 
+      };
     }
 
     // ==========================================
@@ -159,15 +231,32 @@ export async function POST(request) {
     // ==========================================
     let outcomeStatus = 'NORMAL';
     let outcomeReason = 'Processed successfully';
+    let anomalyDiff = 0;
+    let average = 72;
 
     if (deviceState.history.length > 0) {
       const sum = deviceState.history.reduce((a, b) => a + b, 0);
-      const average = sum / deviceState.history.length;
+      average = sum / deviceState.history.length;
+      anomalyDiff = Math.abs(heartRate - average);
       
-      if (Math.abs(heartRate - average) > 40) {
+      if (anomalyDiff > 40) {
         outcomeStatus = 'FLAGGED';
         outcomeReason = 'Flagged: Telemetry deviation exceeds baseline';
+        checks.anomaly = { 
+          status: "FAILED", 
+          detail: `Telemetry Deviation Flagged: Delta from baseline is ${anomalyDiff.toFixed(1)} BPM (Threshold: 40 BPM).` 
+        };
+      } else {
+        checks.anomaly = { 
+          status: "PASSED", 
+          detail: `Telemetry Delta is ${anomalyDiff.toFixed(1)} BPM from baseline (Threshold: 40 BPM).` 
+        };
       }
+    } else {
+      checks.anomaly = { 
+        status: "PASSED", 
+        detail: "No historical baseline loaded yet. Anomaly detection skipped for initial write." 
+      };
     }
 
     deviceState.history.push(heartRate);

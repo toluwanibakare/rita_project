@@ -9,12 +9,14 @@ export default function SimulatorPage() {
   const [deviceId, setDeviceId] = useState("DEV-IOT-102");
   const [heartRate, setHeartRate] = useState(72);
   const [gatewayId, setGatewayId] = useState("GW-EDGE-01");
+  const [customAuthToken, setCustomAuthToken] = useState("Bearer iomt_secure_device_secret_token_1");
+  const [customTimeOption, setCustomTimeOption] = useState("current");
   const [loading, setLoading] = useState(false);
   const [currentResponse, setCurrentResponse] = useState(null);
   const [recentLogs, setRecentLogs] = useState([]);
   const [bypassShield, setBypassShield] = useState(false);
   const [currentRequest, setCurrentRequest] = useState(null);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState("server-log");
 
   // Animation & Flow state
   const [activeStep, setActiveStep] = useState(null); // 'wearable' | 'edge' | 'gateway' | 'hospital'
@@ -211,47 +213,77 @@ export default function SimulatorPage() {
   };
 
   // Unified helper to set up request metadata and trigger flow animation
-  const triggerDeviceTelemetry = (device, rate, gateway, bypass) => {
+  const triggerDeviceTelemetry = (device, rate, gateway, bypass, token = null, timeOption = null) => {
+    const activeToken = token !== null ? token : customAuthToken;
+    const activeTimeOption = timeOption !== null ? timeOption : customTimeOption;
+
+    let finalTimestamp = new Date().toISOString();
+    if (activeTimeOption === "replay") {
+      finalTimestamp = new Date(Date.now() - 600000).toISOString(); // 10 minutes ago
+    } else if (activeTimeOption === "future") {
+      finalTimestamp = new Date(Date.now() + 600000).toISOString(); // 10 minutes ahead
+    } else if (activeTimeOption === "invalid") {
+      finalTimestamp = "INVALID_TIMESTAMP_FORMAT_TEST";
+    }
+
     const reqPayload = {
       url: "/api/vitals",
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer iomt_secure_device_secret_token_1"
+        "Authorization": activeToken
       },
       body: {
         deviceId: device,
         heartRate: Number(rate),
         gatewayId: gateway,
-        timestamp: new Date().toISOString(),
+        timestamp: finalTimestamp,
         bypassSqliShield: bypass
       }
     };
     
     setCurrentRequest(reqPayload);
-    setActiveTab("summary"); // Reset tab to summary on new requests
+    setActiveTab("server-log"); // Reset tab to live server log on new requests
 
     animateFlow(async () => {
       return sendDeviceData(
         reqPayload.body.deviceId,
         reqPayload.body.heartRate,
         reqPayload.body.gatewayId,
-        reqPayload.body.bypassSqliShield
+        reqPayload.body.bypassSqliShield,
+        activeToken,
+        finalTimestamp
       );
     });
+  };
+
+  // Main custom manual transmit trigger
+  const handleTransmitCustom = () => {
+    triggerDeviceTelemetry(deviceId, heartRate, gatewayId, bypassShield, customAuthToken, customTimeOption);
   };
 
   // 1. Transmit Baseline Telemetry
   const handleSendNormal = () => {
     const variance = Math.floor(Math.random() * 5) - 2;
-    triggerDeviceTelemetry(deviceId, Number(heartRate) + variance, gatewayId, bypassShield);
+    const finalHR = 72 + variance;
+    setDeviceId("DEV-IOT-102");
+    setHeartRate(finalHR);
+    setGatewayId("GW-EDGE-01");
+    setCustomAuthToken("Bearer iomt_secure_device_secret_token_1");
+    setCustomTimeOption("current");
+    triggerDeviceTelemetry("DEV-IOT-102", finalHR, "GW-EDGE-01", bypassShield, "Bearer iomt_secure_device_secret_token_1", "current");
   };
 
   // 2. Falsified Telemetry (Spoofing)
   const handleSendSpoofing = () => {
     const badValues = [-5, 12, 299, 500, 999];
     const randomBad = badValues[Math.floor(Math.random() * badValues.length)];
-    triggerDeviceTelemetry(deviceId, randomBad, gatewayId, bypassShield);
+    setDeviceId("DEV-IOT-102");
+    setHeartRate(randomBad);
+    setGatewayId("GW-EDGE-01");
+    setCustomAuthToken("Bearer iomt_secure_device_secret_token_1");
+    setCustomTimeOption("current");
+    triggerDeviceTelemetry("DEV-IOT-102", randomBad, "GW-EDGE-01", bypassShield, "Bearer iomt_secure_device_secret_token_1", "current");
   };
 
   // 3. High-Frequency Stress Scan (DoS)
@@ -264,7 +296,7 @@ export default function SimulatorPage() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer iomt_secure_device_secret_token_1"
+        "Authorization": customAuthToken
       },
       body: {
         deviceId: deviceId,
@@ -274,7 +306,7 @@ export default function SimulatorPage() {
         bypassSqliShield: bypassShield
       }
     });
-    setActiveTab("summary");
+    setActiveTab("server-log");
 
     try {
       await simulateAttack(deviceId, 30);
@@ -291,12 +323,23 @@ export default function SimulatorPage() {
 
   // 4. Telemetry Wave Drift (Anomaly)
   const handleSendAnomaly = () => {
-    triggerDeviceTelemetry(deviceId, Number(heartRate) + 55, gatewayId, bypassShield);
+    setDeviceId("DEV-IOT-102");
+    setHeartRate(127);
+    setGatewayId("GW-EDGE-01");
+    setCustomAuthToken("Bearer iomt_secure_device_secret_token_1");
+    setCustomTimeOption("current");
+    triggerDeviceTelemetry("DEV-IOT-102", 127, "GW-EDGE-01", bypassShield, "Bearer iomt_secure_device_secret_token_1", "current");
   };
 
   // 5. Database SQL Injection Payload Test
-  const handleSendSQLi = () => {
-    triggerDeviceTelemetry("DEV-IOT-102'; SELECT * FROM logs;--", Number(heartRate), gatewayId, bypassShield);
+  const handleSendSQLi = (presetPayload = null) => {
+    const payload = presetPayload || "DEV-IOT-102'; SELECT * FROM logs;--";
+    setDeviceId(payload);
+    setHeartRate(72);
+    setGatewayId("GW-EDGE-01");
+    setCustomAuthToken("Bearer iomt_secure_device_secret_token_1");
+    setCustomTimeOption("current");
+    triggerDeviceTelemetry(payload, 72, "GW-EDGE-01", bypassShield, "Bearer iomt_secure_device_secret_token_1", "current");
   };
 
   const isWearableStep = activeStep?.startsWith("wearable");
@@ -409,7 +452,7 @@ export default function SimulatorPage() {
               
               <div className="space-y-5 mb-6">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 mb-2 block">Device Configuration</label>
+                  <label className="text-xs font-bold text-slate-500 mb-2 block">Device Configuration</label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Device ID</span>
@@ -434,7 +477,37 @@ export default function SimulatorPage() {
                   </div>
                 </div>
 
-                {/* Dynamic Heartbeat Card */}
+                {/* 2. Custom Security Headers & Parameters */}
+                <div>
+                  <label className="text-xs font-bold text-slate-500 mb-2 block">Security Headers & Parameters</label>
+                  <div className="space-y-3">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Authorization Header (Token)</span>
+                      <input 
+                        type="text" 
+                        value={customAuthToken} 
+                        onChange={e => setCustomAuthToken(e.target.value)} 
+                        className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-600 font-mono focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all outline-none" 
+                        placeholder="Bearer token"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Client Timestamp Offset</span>
+                      <select 
+                        value={customTimeOption} 
+                        onChange={e => setCustomTimeOption(e.target.value)} 
+                        className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all outline-none cursor-pointer"
+                      >
+                        <option value="current">Current Server Time (Valid - 0s Drift)</option>
+                        <option value="replay">Replayed Session (Invalid - 10 Minutes Old)</option>
+                        <option value="future">Future Clock Drift (Invalid - 10 Minutes Ahead)</option>
+                        <option value="invalid">Malformed Format (Invalid Raw Text)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Dynamic Heartbeat Card */}
                 <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 relative overflow-hidden flex items-center justify-between shadow-inner">
                   <div className="flex items-center gap-3">
                     {/* Pulsing heart SVG */}
@@ -442,7 +515,7 @@ export default function SimulatorPage() {
                       <svg 
                         className="w-7 h-7 text-rose-500 transition-all duration-300" 
                         style={{
-                          animation: `pulseHeart ${60 / heartRate}s infinite cubic-bezier(0.215, 0.61, 0.355, 1)`,
+                          animation: `pulseHeart ${60 / Math.max(10, Math.min(230, heartRate || 72))}s infinite cubic-bezier(0.215, 0.61, 0.355, 1)`,
                         }}
                         fill="currentColor" 
                         viewBox="0 0 24 24"
@@ -473,6 +546,7 @@ export default function SimulatorPage() {
                   </div>
                 </div>
 
+                {/* 4. Heart Rate Simulator */}
                 <div>
                   <div className="flex justify-between mb-2">
                     <label className="text-xs font-semibold text-slate-500">Heart Rate Simulation</label>
@@ -513,8 +587,8 @@ export default function SimulatorPage() {
                   </div>
                 </div>
 
-                {/* Advanced Security Sandbox controls */}
-                <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-4 shadow-sm mt-5">
+                {/* 5. Advanced Security Sandbox controls */}
+                <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 pr-3">
                       <span className="text-[9px] uppercase font-bold text-blue-600 tracking-wider">Advanced Sandbox Control</span>
@@ -534,6 +608,18 @@ export default function SimulatorPage() {
                     </label>
                   </div>
                 </div>
+
+                {/* 6. Primary Action Trigger Button */}
+                <button
+                  onClick={handleTransmitCustom}
+                  disabled={loading}
+                  className="w-full py-3 px-4 rounded-xl font-extrabold text-sm tracking-wide bg-gradient-to-r from-sky-600 to-blue-600 text-white hover:from-sky-700 hover:to-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg mt-2 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  TRANSMIT CUSTOM TELEMETRY PACKET
+                </button>
               </div>
             </div>
 
@@ -829,7 +915,27 @@ export default function SimulatorPage() {
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
                     <span className="text-[10px] text-slate-500 font-sans font-semibold ml-2">HTTP / API Payload Inspector</span>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
+                    <button 
+                      onClick={() => setActiveTab("server-log")}
+                      className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold transition-colors ${
+                        activeTab === "server-log" 
+                          ? "bg-slate-800 text-sky-400 border border-slate-700" 
+                          : "text-slate-400 hover:bg-slate-900/50"
+                      }`}
+                    >
+                      Server Console Log
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab("sql")}
+                      className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold transition-colors ${
+                        activeTab === "sql" 
+                          ? "bg-slate-800 text-sky-400 border border-slate-700" 
+                          : "text-slate-400 hover:bg-slate-900/50"
+                      }`}
+                    >
+                      SQL Compilation
+                    </button>
                     <button 
                       onClick={() => setActiveTab("summary")}
                       className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold transition-colors ${
@@ -864,7 +970,177 @@ export default function SimulatorPage() {
                 </div>
 
                 {/* Content Area */}
-                <div className="p-4 overflow-x-auto max-h-80 select-text">
+                <div className="p-4 overflow-y-auto max-h-[380px] select-text">
+                  {activeTab === "server-log" && (
+                    <div className="font-mono text-[10px] space-y-1.5 text-slate-300">
+                      <div>[{new Date().toISOString().replace('T', ' ').substring(0, 19)}] INCOMING TELEMETRY REQUEST from IP {currentResponse.requestOrigin || '192.168.1.12'}</div>
+                      
+                      {/* Layer 0: IAM Check */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-500 shrink-0">[LAYER 0: IAM Check]</span>
+                        <span className="text-slate-300">Analyzing Authorization Header...</span>
+                      </div>
+                      <div className="pl-6">
+                        {currentResponse.checks?.auth?.status === "PASSED" ? (
+                          <span className="text-emerald-400">✔ PASSED: {currentResponse.checks.auth.detail}</span>
+                        ) : (
+                          <span className="text-rose-400 font-extrabold">✘ FAILED: {currentResponse.checks?.auth?.detail || 'Verification failed.'}</span>
+                        )}
+                      </div>
+
+                      {/* Layer 0.5: Replay Check */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-500 shrink-0">[LAYER 0.5: Replay Check]</span>
+                        <span className="text-slate-300">Verifying Client Timestamp Drift...</span>
+                      </div>
+                      <div className="pl-6">
+                        {currentResponse.checks?.timestamp?.status === "PASSED" ? (
+                          <span className="text-emerald-400">✔ PASSED: {currentResponse.checks.timestamp.detail}</span>
+                        ) : currentResponse.checks?.timestamp?.status === "FAILED" ? (
+                          <span className="text-rose-400 font-extrabold">✘ FAILED: {currentResponse.checks.timestamp.detail}</span>
+                        ) : (
+                          <span className="text-slate-500">⏳ SKIPPED: {currentResponse.checks?.timestamp?.detail || 'Preceding layer blocked execution.'}</span>
+                        )}
+                      </div>
+
+                      {/* Layer 0.8: SQLi Check */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-500 shrink-0">[LAYER 0.8: SQLi Check]</span>
+                        <span className="text-slate-300">Scanning input parameters for SQL constructs...</span>
+                      </div>
+                      <div className="pl-6">
+                        {currentResponse.checks?.sqli?.status === "PASSED" ? (
+                          <span className="text-emerald-400">✔ PASSED: {currentResponse.checks.sqli.detail}</span>
+                        ) : currentResponse.checks?.sqli?.status === "FAILED" ? (
+                          <span className="text-rose-400 font-extrabold">✘ FAILED: {currentResponse.checks.sqli.detail}</span>
+                        ) : currentResponse.checks?.sqli?.status === "BYPASSED" ? (
+                          <span className="text-amber-400 font-bold">⚠ BYPASSED: {currentResponse.checks.sqli.detail}</span>
+                        ) : (
+                          <span className="text-slate-500">⏳ SKIPPED: {currentResponse.checks?.sqli?.detail || 'Preceding layer blocked execution.'}</span>
+                        )}
+                      </div>
+
+                      {/* Layer 1: Rate Limiter */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-500 shrink-0">[LAYER 1: Rate Limiter]</span>
+                        <span className="text-slate-300">Checking time interval since last write...</span>
+                      </div>
+                      <div className="pl-6">
+                        {currentResponse.checks?.rateLimit?.status === "PASSED" ? (
+                          <span className="text-emerald-400">✔ PASSED: {currentResponse.checks.rateLimit.detail}</span>
+                        ) : currentResponse.checks?.rateLimit?.status === "FAILED" ? (
+                          <span className="text-rose-400 font-extrabold">✘ FAILED: {currentResponse.checks.rateLimit.detail}</span>
+                        ) : (
+                          <span className="text-slate-500">⏳ SKIPPED: {currentResponse.checks?.rateLimit?.detail || 'Preceding layer blocked execution.'}</span>
+                        )}
+                      </div>
+
+                      {/* Layer 2: Medical Range */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-500 shrink-0">[LAYER 2: Medical Range]</span>
+                        <span className="text-slate-300">Validating physiological heart rate bounds...</span>
+                      </div>
+                      <div className="pl-6">
+                        {currentResponse.checks?.range?.status === "PASSED" ? (
+                          <span className="text-emerald-400">✔ PASSED: {currentResponse.checks.range.detail}</span>
+                        ) : currentResponse.checks?.range?.status === "FAILED" ? (
+                          <span className="text-rose-400 font-extrabold">✘ FAILED: {currentResponse.checks.range.detail}</span>
+                        ) : (
+                          <span className="text-slate-500">⏳ SKIPPED: {currentResponse.checks?.range?.detail || 'Preceding layer blocked execution.'}</span>
+                        )}
+                      </div>
+
+                      {/* Layer 3: ML Anomaly */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-slate-500 shrink-0">[LAYER 3: ML Anomaly]</span>
+                        <span className="text-slate-300">Comparing vital reading against historical baseline...</span>
+                      </div>
+                      <div className="pl-6">
+                        {currentResponse.checks?.anomaly?.status === "PASSED" ? (
+                          <span className="text-emerald-400">✔ PASSED: {currentResponse.checks.anomaly.detail}</span>
+                        ) : currentResponse.checks?.anomaly?.status === "FAILED" ? (
+                          <span className="text-amber-400 font-bold">⚠ FLAGGED: {currentResponse.checks.anomaly.detail}</span>
+                        ) : (
+                          <span className="text-slate-500">⏳ SKIPPED: {currentResponse.checks?.anomaly?.detail || 'Preceding layer blocked execution.'}</span>
+                        )}
+                      </div>
+
+                      {/* Database Commit Status */}
+                      <div className="mt-3 pt-3 border-t border-slate-800 space-y-1 bg-slate-950/40 p-2.5 rounded border border-slate-850">
+                        <div className="flex items-start gap-2">
+                          <span className="text-slate-400 shrink-0 font-bold">[PIPELINE VERDICT]</span>
+                          <span className={`font-extrabold ${
+                            currentResponse.status === "BLOCKED" 
+                              ? "text-rose-400 animate-pulse" 
+                              : currentResponse.status === "FLAGGED" 
+                                ? "text-amber-400" 
+                                : "text-emerald-400"
+                          }`}>
+                            REQUEST {currentResponse.status} AT {currentResponse.stage} STAGE
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-slate-400 shrink-0 font-bold">[DATABASE COMMIT]</span>
+                          <span className={`font-extrabold ${
+                            currentResponse.reachedHospitalServer 
+                              ? currentResponse.dbProtectionType?.includes("Bypassed") 
+                                ? "text-amber-400 font-extrabold" 
+                                : "text-emerald-400" 
+                              : "text-rose-400"
+                          }`}>
+                            {currentResponse.reachedHospitalServer 
+                              ? `COMMITTED SUCCESSFULLY via ${currentResponse.dbProtectionType}` 
+                              : `BLOCKED / ISOLATED (No database write executed)`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === "sql" && (
+                    <div className="font-mono text-[10px] space-y-4">
+                      {/* 1. Insecure Concatenation Assembly */}
+                      <div className="space-y-1 bg-slate-950 p-3 rounded border border-rose-950/40">
+                        <div className="text-rose-400 font-extrabold border-b border-rose-950/30 pb-1 flex items-center justify-between">
+                          <span>⚠️ INSECURE QUERY ASSEMBLY (Vulnerable String Interpolation)</span>
+                          <span className="text-[9px] bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 text-rose-400 font-sans">Risk: HIGH</span>
+                        </div>
+                        <pre className="text-slate-400 overflow-x-auto pt-2 text-[9.5px]">
+{`INSERT INTO public.logs ("deviceId", "heartRate", "decision", "dbProtectionType") 
+VALUES ('`}<span className="text-rose-400 font-extrabold underline">{currentRequest?.body?.deviceId || deviceId}</span>{`', ${currentRequest?.body?.heartRate || heartRate}, '${currentResponse.status}', 'Insecure String Concatenation');`}
+                        </pre>
+                        <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1.5 font-sans">
+                          <strong>Vulnerability Mechanics:</strong> If you use simple string templates, any semicolon (<code>;</code>) input terminates the original query. The database engine immediately compiles and executes whatever SQL commands follow the terminator under root credentials (e.g. leaking metrics or dropping databases).
+                        </p>
+                      </div>
+
+                      {/* 2. Secure Prepared Parameterized Bindings */}
+                      <div className="space-y-1 bg-slate-950 p-3 rounded border border-emerald-950/40">
+                        <div className="text-emerald-400 font-extrabold border-b border-emerald-950/30 pb-1 flex items-center justify-between">
+                          <span>✅ SECURE QUERY ASSEMBLY (Prepared Parameterized Query)</span>
+                          <span className="text-[9px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 text-emerald-400 font-sans">Secure</span>
+                        </div>
+                        <pre className="text-slate-400 overflow-x-auto pt-2 text-[9.5px]">
+{`-- Step 1: Pre-compile statement template inside SQL Parser
+PREPARE insert_log (text, numeric, text, text) AS
+INSERT INTO public.logs ("deviceId", "heartRate", "decision", "dbProtectionType") 
+VALUES ($1, $2, $3, $4);
+
+-- Step 2: Safely bind parameters and execute
+EXECUTE insert_log(
+  $1 = '`}<span className="text-emerald-400 font-semibold">{currentRequest?.body?.deviceId || deviceId}</span>{`',
+  $2 = ${currentRequest?.body?.heartRate || heartRate},
+  $3 = '${currentResponse.status}',
+  $4 = '${currentResponse.reachedHospitalServer ? currentResponse.dbProtectionType : 'Isolated (No Write)'}'
+);`}
+                        </pre>
+                        <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1.5 font-sans">
+                          <strong>Defense Mechanics:</strong> The SQL command template layout is pre-compiled before variables are bound. Input parameters are handled strictly as data literals—not code. The single quotes and command terminators are treated as plain text, rendering the injection fully inert.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {activeTab === "summary" && (
                     <div className="space-y-3 font-sans text-slate-300">
                       <div className="flex items-start gap-3">
