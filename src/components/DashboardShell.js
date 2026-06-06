@@ -49,7 +49,12 @@ export default function DashboardShell({ children }) {
         const res = await fetchLogs();
         const logsArray = Array.isArray(res) ? res : (res && res.logs) || [];
         if (logsArray.length > 0) {
-          handleNewThreat(logsArray[0]);
+          const logTime = new Date(logsArray[0].timestamp).getTime();
+          const now = Date.now();
+          // Only trigger on load if the threat happened in the last 2 minutes
+          if (now - logTime < 120000) {
+            handleNewThreat(logsArray[0]);
+          }
         }
       } catch (err) {
         console.error("Emergency system failed to check telemetry logs:", err);
