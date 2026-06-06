@@ -185,9 +185,9 @@ export default function SimulatorPage() {
   };
 
   const PipelineNode = ({ id, label, active, error }) => {
-    let bg = "bg-slate-800 border-slate-700 text-slate-400";
-    if (active) bg = "bg-cyan-900 border-cyan-500 text-cyan-100 shadow-[0_0_15px_rgba(6,182,212,0.5)]";
-    if (error) bg = "bg-rose-900 border-rose-500 text-rose-100 shadow-[0_0_15px_rgba(244,63,94,0.5)]";
+    let bg = "bg-white border-slate-200 text-slate-500 shadow-sm";
+    if (active) bg = "bg-cyan-50 border-cyan-400 text-cyan-800 shadow-[0_0_15px_rgba(6,182,212,0.3)]";
+    if (error) bg = "bg-rose-50 border-rose-400 text-rose-800 shadow-[0_0_15px_rgba(244,63,94,0.3)]";
     
     return (
       <div className={`flex flex-col items-center justify-center w-24 h-24 rounded-lg border-2 transition-all duration-300 ${bg}`}>
@@ -197,28 +197,30 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       
       {/* SECTION 1: SCENARIO SELECTOR */}
-      <div className="bg-slate-900 border-b border-slate-800 p-4 shrink-0 overflow-x-auto">
+      <div className="bg-white border-b border-slate-200 p-4 shrink-0 overflow-x-auto shadow-sm relative z-20">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Select Threat Scenario</h2>
+          <div className="flex items-center justify-between mb-3">
+             <h2 className="text-sm font-extrabold text-slate-500 uppercase tracking-wider">RITA Simulator — Select Threat Scenario</h2>
+          </div>
           <div className="flex gap-3">
             {SCENARIOS.map(s => (
               <button
                 key={s.id}
                 onClick={() => handleSelect(s)}
-                className={`flex flex-col items-start p-3 rounded-lg border text-left min-w-[200px] transition-colors ${
+                className={`flex flex-col items-start p-3 rounded-lg border text-left min-w-[200px] transition-colors shadow-sm ${
                   selectedScenario.id === s.id 
-                    ? `bg-${s.color}-900/30 border-${s.color}-500/50 shadow-[0_0_10px_rgba(var(--color-${s.color}-500),0.1)]` 
-                    : 'bg-slate-800 border-slate-700 hover:bg-slate-750'
+                    ? `bg-${s.color}-50 border-${s.color}-400 shadow-[0_0_10px_rgba(var(--color-${s.color}-500),0.1)]` 
+                    : 'bg-white border-slate-200 hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <div className={`w-2 h-2 rounded-full bg-${s.color}-500`} />
-                  <span className={`font-semibold text-${s.color}-400 text-sm`}>{s.name}</span>
+                  <span className={`font-bold text-${s.color}-700 text-sm`}>{s.name}</span>
                 </div>
-                <span className="text-xs text-slate-400">{s.desc}</span>
+                <span className="text-xs text-slate-500 font-medium">{s.desc}</span>
               </button>
             ))}
           </div>
@@ -228,10 +230,10 @@ export default function SimulatorPage() {
       <div className="flex-1 flex overflow-hidden">
         
         {/* SECTION 2: ATTACK NARRATIVE PANEL */}
-        <div className="w-[40%] bg-slate-900/50 border-r border-slate-800 overflow-y-auto p-6">
+        <div className="w-[40%] bg-white border-r border-slate-200 overflow-y-auto p-6 shadow-sm z-10">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-slate-100">{selectedScenario.name}</h2>
-            <span className={`px-2 py-1 rounded text-xs font-bold bg-${selectedScenario.color}-900/50 text-${selectedScenario.color}-400 border border-${selectedScenario.color}-500/30`}>
+            <h2 className="text-xl font-black text-slate-900">{selectedScenario.name}</h2>
+            <span className={`px-2 py-1 rounded text-xs font-bold bg-${selectedScenario.color}-100 text-${selectedScenario.color}-700 border border-${selectedScenario.color}-300`}>
               {selectedScenario.narrative.riskLevel}
             </span>
           </div>
@@ -239,55 +241,55 @@ export default function SimulatorPage() {
           <div className="space-y-6 text-sm">
             
             {/* THREAT PROFILE */}
-            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
-              <div className="bg-slate-800/50 px-4 py-2 border-b border-slate-800 font-semibold text-slate-300">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-bold text-slate-700">
                 THREAT PROFILE
               </div>
               <div className="p-4 space-y-3">
                 <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-medium">Attacker:</span>
-                  <span className="text-slate-300">{selectedScenario.narrative.attacker}</span>
+                  <span className="text-slate-500 font-bold">Attacker:</span>
+                  <span className="text-slate-800 font-medium">{selectedScenario.narrative.attacker}</span>
                 </div>
                 <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-medium">Objective:</span>
-                  <span className="text-slate-300">{selectedScenario.narrative.objective}</span>
+                  <span className="text-slate-500 font-bold">Objective:</span>
+                  <span className="text-slate-800 font-medium">{selectedScenario.narrative.objective}</span>
                 </div>
                 <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-medium">Method:</span>
-                  <span className="text-slate-300">{selectedScenario.narrative.method}</span>
+                  <span className="text-slate-500 font-bold">Method:</span>
+                  <span className="text-slate-800 font-medium">{selectedScenario.narrative.method}</span>
                 </div>
                 <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-medium">Entry Point:</span>
-                  <span className="text-slate-300 font-mono text-xs bg-slate-950 px-1 py-0.5 rounded">{selectedScenario.narrative.entryPoint}</span>
+                  <span className="text-slate-500 font-bold">Entry Point:</span>
+                  <span className="text-slate-800 font-mono text-xs bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded font-bold">{selectedScenario.narrative.entryPoint}</span>
                 </div>
               </div>
             </div>
 
             {/* ATTACK EXPLANATION */}
             <div>
-              <h3 className="text-slate-400 font-bold mb-2 uppercase text-xs tracking-wider">How the attack works</h3>
-              <p className="text-slate-300 leading-relaxed">
+              <h3 className="text-slate-500 font-bold mb-2 uppercase text-xs tracking-wider">How the attack works</h3>
+              <p className="text-slate-700 leading-relaxed font-medium">
                 {selectedScenario.narrative.explanation}
               </p>
             </div>
 
             {/* DEFENSE MECHANISM */}
-            <div className="bg-cyan-950/20 rounded-lg border border-cyan-900/30 overflow-hidden">
-               <div className="bg-cyan-900/30 px-4 py-2 border-b border-cyan-900/30 font-semibold text-cyan-400">
+            <div className="bg-cyan-50/50 rounded-lg border border-cyan-200 shadow-sm overflow-hidden">
+               <div className="bg-cyan-100/50 px-4 py-2 border-b border-cyan-200 font-bold text-cyan-800">
                 DEFENSE MECHANISM
               </div>
               <div className="p-4 space-y-3">
                 <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-cyan-600/80 font-medium">Layer:</span>
-                  <span className="text-cyan-200">{selectedScenario.narrative.defenseName}</span>
+                  <span className="text-cyan-700 font-bold">Layer:</span>
+                  <span className="text-cyan-900 font-bold">{selectedScenario.narrative.defenseName}</span>
                 </div>
                 <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-cyan-600/80 font-medium">Technology:</span>
-                  <span className="text-cyan-200">{selectedScenario.narrative.defenseTech}</span>
+                  <span className="text-cyan-700 font-bold">Technology:</span>
+                  <span className="text-cyan-900 font-bold">{selectedScenario.narrative.defenseTech}</span>
                 </div>
-                <div className="mt-2 text-cyan-100/80 leading-relaxed">
-                  <p className="mb-2"><span className="font-semibold text-cyan-300">How:</span> {selectedScenario.narrative.defenseHow}</p>
-                  <p><span className="font-semibold text-cyan-300">Second Line:</span> {selectedScenario.narrative.secondLine}</p>
+                <div className="mt-2 text-cyan-800 leading-relaxed font-medium">
+                  <p className="mb-2"><span className="font-bold text-cyan-900">How:</span> {selectedScenario.narrative.defenseHow}</p>
+                  <p><span className="font-bold text-cyan-900">Second Line:</span> {selectedScenario.narrative.secondLine}</p>
                 </div>
               </div>
             </div>
@@ -296,14 +298,14 @@ export default function SimulatorPage() {
         </div>
 
         {/* SECTION 3: LIVE API FLOW */}
-        <div className="flex-1 bg-slate-950 p-8 overflow-y-auto flex flex-col relative">
+        <div className="flex-1 bg-slate-50 p-8 overflow-y-auto flex flex-col relative">
           
           <div className="flex justify-between items-center mb-10">
-            <h2 className="text-lg font-bold text-slate-300">Live API Visualization</h2>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">RITA — Live API Visualization</h2>
             <button 
               onClick={runScenario}
               disabled={status === "running"}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded shadow-lg disabled:opacity-50 transition-colors"
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-md disabled:opacity-50 transition-colors"
             >
               {status === "running" ? "Transmitting..." : "Run Scenario"}
             </button>
@@ -312,7 +314,7 @@ export default function SimulatorPage() {
           {/* Flow Diagram */}
           <div className="flex items-center justify-between mb-12 px-4 relative">
             {/* Connecting lines */}
-            <div className="absolute top-1/2 left-12 right-12 h-1 bg-slate-800 -z-10 -translate-y-1/2" />
+            <div className="absolute top-1/2 left-12 right-12 h-1 bg-slate-200 -z-10 -translate-y-1/2" />
             
             <PipelineNode id="device" label="IoMT Device" active={pipelineState === "device"} />
             <PipelineNode id="edge" label="Edge Gateway" active={pipelineState === "edge"} />
@@ -338,16 +340,16 @@ export default function SimulatorPage() {
             <div className="grid grid-cols-2 gap-6 mt-4">
               
               {/* Security Checks Detail */}
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                <h3 className="text-sm font-bold text-slate-400 mb-3 border-b border-slate-800 pb-2">Security Pipeline Analysis</h3>
+              <div className="bg-white border border-slate-200 shadow-sm rounded-lg p-4">
+                <h3 className="text-sm font-bold text-slate-600 mb-3 border-b border-slate-100 pb-2">Security Pipeline Analysis</h3>
                 <div className="space-y-2">
                   {apiResult.checks && Object.entries(apiResult.checks).map(([key, check]) => (
                     <div key={key} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300">{key.toUpperCase()}</span>
-                      <span className={`font-mono px-2 py-0.5 rounded ${
-                        check.status === "PASSED" ? "bg-emerald-900/30 text-emerald-400" :
-                        check.status === "FAILED" ? "bg-rose-900/30 text-rose-400" :
-                        check.status === "BYPASSED" ? "bg-amber-900/30 text-amber-400" : "text-slate-500"
+                      <span className="text-slate-600 font-bold">{key.toUpperCase()}</span>
+                      <span className={`font-mono font-bold px-2 py-0.5 rounded ${
+                        check.status === "PASSED" ? "bg-emerald-100 text-emerald-700" :
+                        check.status === "FAILED" ? "bg-rose-100 text-rose-700" :
+                        check.status === "BYPASSED" ? "bg-amber-100 text-amber-700" : "text-slate-500"
                       }`}>
                         {check.status}
                       </span>
@@ -357,25 +359,25 @@ export default function SimulatorPage() {
               </div>
 
               {/* Final Verdict */}
-              <div className={`border rounded-lg p-4 flex flex-col justify-center ${
-                apiResult.status === "BLOCKED" ? "bg-rose-950/20 border-rose-900" :
-                apiResult.status === "FLAGGED" ? "bg-amber-950/20 border-amber-900" :
-                "bg-emerald-950/20 border-emerald-900"
+              <div className={`border shadow-sm rounded-lg p-4 flex flex-col justify-center ${
+                apiResult.status === "BLOCKED" ? "bg-rose-50 border-rose-200" :
+                apiResult.status === "FLAGGED" ? "bg-amber-50 border-amber-200" :
+                "bg-emerald-50 border-emerald-200"
               }`}>
-                <h3 className="text-xs uppercase tracking-wider mb-1 text-slate-500">System Verdict</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 text-slate-500">System Verdict</h3>
                 <div className={`text-2xl font-black mb-2 ${
-                  apiResult.status === "BLOCKED" ? "text-rose-500" :
-                  apiResult.status === "FLAGGED" ? "text-amber-500" : "text-emerald-500"
+                  apiResult.status === "BLOCKED" ? "text-rose-600" :
+                  apiResult.status === "FLAGGED" ? "text-amber-600" : "text-emerald-600"
                 }`}>
                   {apiResult.status}
                 </div>
-                <div className="text-sm text-slate-300 mb-1">
-                  <span className="font-semibold">Reason:</span> {apiResult.reason}
+                <div className="text-sm text-slate-700 mb-1 font-medium">
+                  <span className="font-bold text-slate-900">Reason:</span> {apiResult.reason}
                 </div>
-                <div className="text-sm text-slate-300">
-                  <span className="font-semibold">Database:</span> {apiResult.reachedHospitalServer ? 
-                    <span className="text-emerald-400">Record committed ({apiResult.dbProtectionType || 'Parameterized'})</span> : 
-                    <span className="text-rose-400">Write blocked (Threat isolated)</span>
+                <div className="text-sm text-slate-700 font-medium">
+                  <span className="font-bold text-slate-900">Database:</span> {apiResult.reachedHospitalServer ? 
+                    <span className="text-emerald-600 font-bold">Record committed ({apiResult.dbProtectionType || 'Parameterized'})</span> : 
+                    <span className="text-rose-600 font-bold">Write blocked (Threat isolated)</span>
                   }
                 </div>
               </div>
