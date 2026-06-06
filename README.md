@@ -122,7 +122,7 @@ Every incoming payload processed by the backend API at `/api/vitals` is passed t
 | **Layer 0.8** | **Input Sanitization & SQLi Gate** | Checks text fields (`deviceId`, `gatewayId`) against a rigid regular expression filtering SQL statements. | Intercepts common SQL injections before queries are constructed. |
 | **Layer 1** | **DoS Rate Limiter** | Measures interval since last request for the specific `deviceId`, blocking writes under 800ms. | Prevents API flooding, connection pool exhaustion, and DoS attacks. |
 | **Layer 2** | **Medical Range Validation** | Enforces clinical bounds for human survival, rejecting heart rates outside `30 - 220 BPM`. | Mitigates data injection attacks reporting invalid physiological readings. |
-| **Layer 3** | **Heuristic Anomaly Scanner** | Calculates running mathematical moving averages (5-packet buffer) and flags deviations $> 40$ BPM. | Identifies sudden telemetry drift suggesting device tempering. |
+| **Layer 3** | **Statistical Anomaly Scanner** | Calculates running mathematical moving averages (5-packet buffer) and flags deviations $> 40$ BPM. | Identifies sudden telemetry drift suggesting device tempering. |
 
 > [!TIP]
 > For high-reliability clinical environments, executing defensive checks in order of compute cost (IAM & Time drift first, expensive regex parses and database queries last) preserves precious server compute and DB connection bandwidth under DoS attacks.
@@ -136,7 +136,7 @@ You can test these defensive layers live by clicking different simulation option
 1. **Baseline Telemetry (Normal Signs):** Streams standard vitals (e.g. 70-75 BPM). This clears all validation barriers, logs the transaction as `NORMAL`, and commits to the database with a green `Parameterized Query (Safe)` badge.
 2. **Out-of-Bounds Test (Medical Spoofing):** Sends an impossible heart rate reading (e.g. 500 BPM). The packet is successfully parsed but is instantly blocked at **Layer 2 (Medical Range Validation)**, keeping unrealistic clinical data out of our medical records.
 3. **High-Frequency Stress (DoS Simulation):** Concurrent floods of 30 parallel packets are fired instantly. The gateway processes the first request and enforces **Layer 1 (Rate Limiting)** on subsequent packets, throttling the flood and keeping the database pool safe.
-4. **Telemetry Drift (Statistical Anomaly):** Simulates sudden physiological drift by introducing a spike (+55 BPM). The anomaly detection algorithm computes the drift delta against the rolling baseline average and labels the write as `FLAGGED` to alert nurses.
+4. **Telemetry Drift:** Simulates sudden physiological drift by introducing a spike (+55 BPM). The system labels the write as `FLAGGED` to alert nurses.
 5. **Database SQL Injection Probe (Exploit):** Inject a malicious SQL payload (`DEV-IOT-102 SELECT...`).
    - **Shield Active (Default):** The gateway intercepts the transaction at **Layer 0.8 (SQLi Gate)**, instantly returning an `HTTP 400 Bad Request`.
    - **Shield Bypassed (Toggle ON):** Simulates a zero-day gateway vulnerability. The packet skips regex filtering and reaches PostgreSQL. Thanks to **parameterized DB statements**, the server isolates the SQL code and saves the query *strictly as literal text*, rendering the attack totally harmless.

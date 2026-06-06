@@ -44,6 +44,21 @@ export default function DashboardShell({ children }) {
       }
     };
 
+    const checkEmergency = async () => {
+      try {
+        const res = await fetchLogs();
+        const logsArray = Array.isArray(res) ? res : (res && res.logs) || [];
+        if (logsArray.length > 0) {
+          handleNewThreat(logsArray[0]);
+        }
+      } catch (err) {
+        console.error("Emergency system failed to check telemetry logs:", err);
+      }
+    };
+
+    // Initial check
+    checkEmergency();
+
     // Subscribe to realtime insert events for instantaneous threat alerting
     const channel = supabase
       .channel("alarm-logs")

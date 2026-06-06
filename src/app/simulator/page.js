@@ -1,390 +1,839 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { sendDeviceData } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
-const SCENARIOS = [
+// ─── Color mapping for console lines ───────────────────────────────
+const COLOR_MAP = {
+  default: "text-slate-300",
+  header:  "text-cyan-400 font-bold",
+  success: "text-emerald-400",
+  error:   "text-rose-400 font-semibold",
+  warning: "text-amber-400",
+  info:    "text-sky-400",
+  dim:     "text-slate-600",
+  bright:  "text-slate-100",
+};
+
+// ─── Preset scenarios ──────────────────────────────────────────────
+const PRESETS = [
   {
-    id: "normal",
-    name: "Normal Telemetry",
-    color: "emerald",
-    desc: "Baseline health data",
-    config: { deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
-    narrative: {
-      attacker: "None (Legitimate Patient Wearable)",
-      objective: "Transmit normal resting heart rate to hospital dashboard",
-      method: "Standard HTTPS POST request carrying JSON vitals",
-      entryPoint: "Edge Gateway → Cloud API (/api/vitals)",
-      riskLevel: "SAFE",
-      explanation: "This is a normal baseline transmission. The device sends a realistic heart rate (72 BPM) with a valid authorization token and current timestamp.",
-      defenseName: "All Layers Passed",
-      defenseTech: "N/A",
-      defenseHow: "The data clears all 6 security layers because the authorization is valid, the timestamp is recent, the data format is clean, and the vitals are within normal human ranges.",
-      secondLine: "Data is inserted into the PostgreSQL database using parameterized queries for safety."
-    }
+    label: "Normal Telemetry",
+    desc: "Valid baseline vitals",
+    dot: "bg-emerald-500",
+    border: "border-emerald-500/30 hover:border-emerald-400/60",
+    text: "text-emerald-400",
+    config: {
+      deviceId: "DEV-IOT-102",
+      heartRate: 72,
+      gatewayId: "GW-EDGE-01",
+      authToken: "Bearer iomt_secure_device_secret_token_1",
+      timeMode: "current",
+      bypassShield: false,
+    },
   },
   {
-    id: "sqli",
-    name: "SQL Injection",
-    color: "rose",
-    desc: "Database attack payload",
-    config: { deviceId: "DEV-IOT-102'; DROP TABLE logs;--", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
-    narrative: {
-      attacker: "Malicious insider or compromised edge gateway",
-      objective: "Destroy or corrupt the hospital's patient vital records table",
-      method: "Inject SQL DELETE/DROP commands through the device ID field",
-      entryPoint: "HTTP POST body → 'deviceId' parameter",
-      riskLevel: "CRITICAL",
-      explanation: "The attacker modifies the device identifier from a legitimate value to a malicious SQL payload (e.g. `'; DROP TABLE logs;--`). If the backend uses string concatenation to build SQL queries, this payload would execute a DROP TABLE command, destroying patient records.",
-      defenseName: "Layer 3 — SQL Injection Shield",
-      defenseTech: "Regex pattern matching (Input Sanitization)",
-      defenseHow: "The API scans all text inputs against a known SQL attack pattern library before processing. Malicious constructs like 'DROP TABLE' or 'SELECT' are intercepted and the request is rejected immediately.",
-      secondLine: "Even if regex fails, parameterized DB queries prevent SQL injection."
-    }
+    label: "SQL Injection",
+    desc: "Inject SQL into Device ID",
+    dot: "bg-rose-500",
+    border: "border-rose-500/30 hover:border-rose-400/60",
+    text: "text-rose-400",
+    config: {
+      deviceId: "DEV-IOT-102'; DROP TABLE logs;--",
+      heartRate: 72,
+      gatewayId: "GW-EDGE-01",
+      authToken: "Bearer iomt_secure_device_secret_token_1",
+      timeMode: "current",
+      bypassShield: false,
+    },
   },
   {
-    id: "bypass",
-    name: "SQLi (Bypass Shield)",
-    color: "amber",
-    desc: "Testing DB parameterization",
-    config: { deviceId: "DEV-IOT-102'; SELECT * FROM logs;--", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: true },
-    narrative: {
-      attacker: "Advanced Persistent Threat (APT)",
-      objective: "Extract sensitive patient data from the database",
-      method: "SQL Injection exploiting a zero-day vulnerability in the gateway shield",
-      entryPoint: "Database Execution Layer",
-      riskLevel: "HIGH",
-      explanation: "This scenario simulates a 'Zero-Day' attack where the primary regex shield (Layer 3) fails or is bypassed. The malicious SQL payload (`'; SELECT * FROM logs;--`) successfully reaches the database execution layer.",
-      defenseName: "Database Parameterization",
-      defenseTech: "Prepared Statements (Supabase SDK)",
-      defenseHow: "PostgreSQL's parameterized statements treat ALL user input as literal data, never as executable SQL code. The database engine pre-compiles the query structure, so the injection string is stored harmlessly as plain text in the deviceId column.",
-      secondLine: "The attack is rendered inert, proving the architecture is secure even if edge defenses fail."
-    }
+    label: "Spoofed Vitals",
+    desc: "Out-of-range heart rate",
+    dot: "bg-orange-500",
+    border: "border-orange-500/30 hover:border-orange-400/60",
+    text: "text-orange-400",
+    config: {
+      deviceId: "DEV-IOT-102",
+      heartRate: 999,
+      gatewayId: "GW-EDGE-01",
+      authToken: "Bearer iomt_secure_device_secret_token_1",
+      timeMode: "current",
+      bypassShield: false,
+    },
   },
   {
-    id: "spoof",
-    name: "Spoofed Vitals",
-    color: "rose",
-    desc: "Impossible medical values",
-    config: { deviceId: "DEV-IOT-102", heartRate: 999, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
-    narrative: {
-      attacker: "External hacker spoofing device data",
-      objective: "Trigger false alarms or corrupt medical analytics",
-      method: "Send physiologically impossible heart rate values (999 BPM)",
-      entryPoint: "HTTP POST body → 'heartRate' parameter",
-      riskLevel: "HIGH",
-      explanation: "The attacker intercepts the connection and alters the biometric payload to send a heart rate of 999 BPM. If accepted, this could cause panic, trigger emergency responses, or skew AI analytics.",
-      defenseName: "Layer 5 — Medical Range Validation",
-      defenseTech: "Contextual Boundary Checking",
-      defenseHow: "The security pipeline enforces strict human survival limits (e.g., 30 - 220 BPM). Any value outside this range is immediately flagged as physically impossible and the request is blocked.",
-      secondLine: "Protects the integrity of the clinical database from noise."
-    }
+    label: "Replay Attack",
+    desc: "Timestamp 10 min old",
+    dot: "bg-purple-500",
+    border: "border-purple-500/30 hover:border-purple-400/60",
+    text: "text-purple-400",
+    config: {
+      deviceId: "DEV-IOT-102",
+      heartRate: 72,
+      gatewayId: "GW-EDGE-01",
+      authToken: "Bearer iomt_secure_device_secret_token_1",
+      timeMode: "replay",
+      bypassShield: false,
+    },
   },
   {
-    id: "replay",
-    name: "Replay Attack",
-    color: "rose",
-    desc: "Stale/reused packet",
-    config: { deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "replay", bypassShield: false },
-    narrative: {
-      attacker: "Network Eavesdropper (Man-in-the-Middle)",
-      objective: "Feed old, legitimate data to mask a current critical event",
-      method: "Capture a valid telemetry packet and resend it repeatedly",
-      entryPoint: "Network transmission layer",
-      riskLevel: "MEDIUM",
-      explanation: "An attacker captures a perfectly valid, encrypted packet from yesterday (when the patient was fine). They resend it today while the patient is having a heart attack, hoping the system accepts the 'fine' data and doesn't sound the alarm.",
-      defenseName: "Layer 2 — Anti-Replay Protection",
-      defenseTech: "Timestamp Drift Validation",
-      defenseHow: "The API compares the packet's timestamp against the server's current time. If the packet is older than the acceptable drift window (e.g., 5 minutes), it is rejected as stale or replayed data.",
-      secondLine: "Ensures only fresh, real-time telemetry is processed."
-    }
+    label: "Invalid Auth",
+    desc: "Bad authorization token",
+    dot: "bg-red-500",
+    border: "border-red-500/30 hover:border-red-400/60",
+    text: "text-red-400",
+    config: {
+      deviceId: "DEV-IOT-102",
+      heartRate: 72,
+      gatewayId: "GW-EDGE-01",
+      authToken: "Bearer INVALID_TOKEN",
+      timeMode: "current",
+      bypassShield: false,
+    },
   },
   {
-    id: "badauth",
-    name: "Invalid Auth",
-    color: "rose",
-    desc: "Wrong authorization token",
-    config: { deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01", authToken: "Bearer INVALID_TOKEN_12345", timeMode: "current", bypassShield: false },
-    narrative: {
-      attacker: "Unauthorized Device / Rogue Node",
-      objective: "Inject data into the hospital network without permission",
-      method: "Guess or forge an authorization bearer token",
-      entryPoint: "HTTP Headers → 'Authorization'",
-      riskLevel: "HIGH",
-      explanation: "An unapproved device attempts to connect to the hospital's API endpoint using a forged or expired authorization token.",
-      defenseName: "Layer 1 — Identity & Access Management",
-      defenseTech: "Bearer Token Authentication",
-      defenseHow: "The very first layer verifies the cryptographic signature of the token. If it doesn't match the hospital's secret keys, the connection is instantly severed (HTTP 401 Unauthorized).",
-      secondLine: "Zero Trust Architecture principle: verify every request."
-    }
+    label: "Anomaly Drift",
+    desc: "Sudden delta deviation",
+    dot: "bg-amber-500",
+    border: "border-amber-500/30 hover:border-amber-400/60",
+    text: "text-amber-400",
+    config: {
+      deviceId: "DEV-IOT-102",
+      heartRate: 127,
+      gatewayId: "GW-EDGE-01",
+      authToken: "Bearer iomt_secure_device_secret_token_1",
+      timeMode: "current",
+      bypassShield: false,
+    },
   },
-  {
-    id: "anomaly",
-    name: "Anomaly Drift",
-    color: "amber",
-    desc: "Sudden spike in vitals",
-    config: { deviceId: "DEV-IOT-102", heartRate: 127, gatewayId: "GW-EDGE-01", authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false },
-    narrative: {
-      attacker: "Patient Health Event (or subtle tampering)",
-      objective: "N/A (Identifies concerning health trends)",
-      method: "Sudden deviation from historical baseline averages",
-      entryPoint: "HTTP POST body → 'heartRate' parameter",
-      riskLevel: "WARNING",
-      explanation: "The heart rate (127 BPM) is technically within human survival limits (so it passes Layer 5), but it represents a sudden, massive spike compared to this specific patient's resting baseline (e.g., 72 BPM).",
-      defenseName: "Layer 6 — Anomaly Detection",
-      defenseTech: "Statistical Baseline Analysis",
-      defenseHow: "The system compares the incoming reading against the patient's rolling historical average. Large deviations are labeled as 'FLAGGED'. The data is saved to the database, but it triggers an emergency dashboard alert.",
-      secondLine: "Balances data retention with proactive medical alerts."
-    }
-  }
 ];
 
+// ═══════════════════════════════════════════════════════════════════
+//  SIMULATOR PAGE — Terminal Console
+// ═══════════════════════════════════════════════════════════════════
 export default function SimulatorPage() {
-  const [selectedScenario, setSelectedScenario] = useState(SCENARIOS[0]);
-  const [status, setStatus] = useState("idle"); // idle, running, complete
-  const [pipelineState, setPipelineState] = useState(null);
-  const [apiResult, setApiResult] = useState(null);
+  // ── Form state ──────────────────────────────────────────────────
+  const [deviceId, setDeviceId] = useState("DEV-IOT-102");
+  const [heartRate, setHeartRate] = useState(72);
+  const [gatewayId, setGatewayId] = useState("GW-EDGE-01");
+  const [authToken, setAuthToken] = useState("Bearer iomt_secure_device_secret_token_1");
+  const [timeMode, setTimeMode] = useState("current");
+  const [bypassShield, setBypassShield] = useState(false);
 
-  const handleSelect = (scenario) => {
-    setSelectedScenario(scenario);
-    setStatus("idle");
-    setPipelineState(null);
-    setApiResult(null);
+  // ── Console state ───────────────────────────────────────────────
+  const [lines, setLines] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [txCount, setTxCount] = useState(0);
+
+  const bottomRef = useRef(null);
+
+  // ── Auto-scroll on new lines ────────────────────────────────────
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [lines]);
+
+  // ── Welcome message on mount ────────────────────────────────────
+  useEffect(() => {
+    const boot = async () => {
+      const welcome = [
+        ["", "dim"],
+        ["  ██████╗  ██╗████████╗ █████╗ ", "header"],
+        ["  ██╔══██╗ ██║╚══██╔══╝██╔══██╗", "header"],
+        ["  ██████╔╝ ██║   ██║   ███████║", "header"],
+        ["  ██╔══██╗ ██║   ██║   ██╔══██║", "header"],
+        ["  ██║  ██║ ██║   ██║   ██║  ██║", "header"],
+        ["  ╚═╝  ╚═╝ ╚═╝   ╚═╝   ╚═╝  ╚═╝", "header"],
+        ["", "dim"],
+        ["  Real-time IoMT Telemetry Analyzer v1.0.0", "info"],
+        ["  Secure API Pipeline Simulation Console", "dim"],
+        ["  ──────────────────────────────────────────────────", "dim"],
+        ["", "dim"],
+        ["  Configure telemetry parameters in the control panel above,", "default"],
+        ["  then press EXECUTE to trace the complete API journey through", "default"],
+        ["  the 6-layer backend security pipeline.", "default"],
+        ["", "dim"],
+        ["  Quick-fill presets are available for common attack scenarios.", "dim"],
+        ["", "dim"],
+        ["  Awaiting transmission...", "success"],
+        ["", "dim"],
+      ];
+      for (const [text, color] of welcome) {
+        setLines((p) => [...p, { id: `${Date.now()}-${Math.random()}`, text, color }]);
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    };
+    boot();
+  }, []);
+
+  // ── Background Supabase sync (keeps real-time pipeline warm) ────
+  useEffect(() => {
+    const channel = supabase
+      .channel("simulator-console")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "logs" }, () => {})
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════════
+  //  HELPERS
+  // ═══════════════════════════════════════════════════════════════
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Pace multiplier — makes the console feel deliberate and real
+  const PACE = 2.8;
+
+  const print = (text, color = "default") => {
+    setLines((p) => [...p, { id: `${Date.now()}-${Math.random()}`, text, color }]);
   };
 
-  const runScenario = async () => {
-    setStatus("running");
-    setPipelineState("device");
-    await new Promise(r => setTimeout(r, 600));
+  // Prints lines with deliberate pacing + random jitter for natural feel
+  const printBatch = async (batch, delay = 55) => {
+    for (const item of batch) {
+      const [text, color] = Array.isArray(item) ? item : [item, "default"];
+      print(text, color || "default");
+      const jitter = Math.random() * 80;
+      if (delay > 0) await sleep(delay * PACE + jitter);
+    }
+  };
 
-    setPipelineState("edge");
-    await new Promise(r => setTimeout(r, 600));
+  // Longer pauses between major sections (simulates processing)
+  const pause = (ms) => sleep(ms * PACE + Math.random() * 200);
 
-    setPipelineState("api");
-    await new Promise(r => setTimeout(r, 600));
+  const clearConsole = () => setLines([]);
 
-    setPipelineState("security");
-    
-    // Config prep
-    const config = selectedScenario.config;
-    let finalTimestamp = new Date().toISOString();
-    if (config.timeMode === "replay") finalTimestamp = new Date(Date.now() - 600000).toISOString();
+  const statusColor = (s) => {
+    if (s === "PASSED") return "success";
+    if (s === "FAILED") return "error";
+    if (s === "BYPASSED") return "warning";
+    return "dim";
+  };
 
-    let res;
-    try {
-      res = await sendDeviceData(config.deviceId, config.heartRate, config.gatewayId, config.bypassShield, config.authToken, finalTimestamp);
-    } catch (e) {
-      res = { status: "ERROR", error: e.message };
+  const statusIcon = (s) => {
+    if (s === "PASSED") return "PASSED";
+    if (s === "FAILED") return "FAILED";
+    if (s === "BYPASSED") return "BYPASSED";
+    return "SKIPPED";
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  //  EXECUTE TRANSMISSION — The core function
+  // ═══════════════════════════════════════════════════════════════
+  const executeTransmission = async (overrides = {}) => {
+    if (isRunning) return;
+    setIsRunning(true);
+
+    const num = txCount + 1;
+    setTxCount(num);
+
+    // Resolve values (overrides take precedence for preset calls)
+    const dev = overrides.deviceId ?? deviceId;
+    const hr = overrides.heartRate ?? heartRate;
+    const gw = overrides.gatewayId ?? gatewayId;
+    const token = overrides.authToken ?? authToken;
+    const tm = overrides.timeMode ?? timeMode;
+    const bypass = overrides.bypassShield ?? bypassShield;
+
+    const now = new Date();
+    let finalTimestamp = now.toISOString();
+    let timeDesc = "Current server time (valid)";
+
+    if (tm === "replay") {
+      finalTimestamp = new Date(Date.now() - 600000).toISOString();
+      timeDesc = "Replayed packet (10 minutes old)";
+    } else if (tm === "future") {
+      finalTimestamp = new Date(Date.now() + 600000).toISOString();
+      timeDesc = "Future clock drift (10 minutes ahead)";
+    } else if (tm === "invalid") {
+      finalTimestamp = "INVALID_TIMESTAMP_FORMAT";
+      timeDesc = "Malformed timestamp string";
     }
 
-    setApiResult(res);
-    await new Promise(r => setTimeout(r, 1000));
-    
-    setPipelineState("database");
-    setStatus("complete");
-  };
-
-  const PipelineNode = ({ id, label, active, error }) => {
-    let bg = "bg-white border-slate-200 text-slate-500 shadow-sm";
-    if (active) bg = "bg-cyan-50 border-cyan-400 text-cyan-800 shadow-[0_0_15px_rgba(6,182,212,0.3)]";
-    if (error) bg = "bg-rose-50 border-rose-400 text-rose-800 shadow-[0_0_15px_rgba(244,63,94,0.3)]";
-    
-    return (
-      <div className={`flex flex-col items-center justify-center w-24 h-24 rounded-lg border-2 transition-all duration-300 ${bg}`}>
-        <span className="text-xs font-bold text-center">{label}</span>
-      </div>
+    // ── BANNER ────────────────────────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["", "dim"],
+        ["  =======================================================================", "dim"],
+        [`   RITA SECURITY PIPELINE  —  TRANSMISSION #${num}`, "header"],
+        [`   ${now.toISOString().replace("T", " ").slice(0, 23)} UTC`, "info"],
+        ["  =======================================================================", "dim"],
+      ],
+      35
     );
+
+    // ── STEP 1: DEVICE COLLECTION ─────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 1] WEARABLE DEVICE  —  BIOMETRIC COLLECTION", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+        [`    Device ID:      ${dev}`, "bright"],
+        [`    Heart Rate:     ${hr} BPM`, "bright"],
+        [`    Gateway Node:   ${gw}`, "bright"],
+        [`    Reading Time:   ${finalTimestamp}`, "default"],
+        [`    Time Mode:      ${timeDesc}`, "dim"],
+        ["", "dim"],
+        ["    >>> Biometric reading captured from IoMT wearable sensor", "success"],
+      ],
+      55
+    );
+    await pause(250);
+
+    // ── STEP 2: EDGE GATEWAY ──────────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 2] EDGE GATEWAY  —  NETWORK FORWARDING", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+        [`    Source:          ${dev} @ Local Network`, "default"],
+        [`    Edge Router:     ${gw}`, "default"],
+        ["    Destination:    RITA Cloud API Gateway (/api/vitals)", "default"],
+        ["    Protocol:       HTTPS / TLS 1.3 (End-to-End Encrypted)", "default"],
+        ["", "dim"],
+        ["    >>> Telemetry packet encrypted and forwarded to cloud endpoint", "success"],
+      ],
+      55
+    );
+    await pause(250);
+
+    // ── STEP 3: HTTP REQUEST ──────────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 3] HTTP REQUEST  —  DISPATCH TO BACKEND", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+        ["", "dim"],
+        ["    POST /api/vitals HTTP/1.1", "info"],
+        ["    Host: rita-gateway.vercel.app", "dim"],
+        [`    Authorization: ${token}`, "dim"],
+        ["    Content-Type: application/json", "dim"],
+        ["", "dim"],
+        ["    Request Body:", "default"],
+        ["    {", "bright"],
+        [`      "deviceId": "${dev}",`, "bright"],
+        [`      "heartRate": ${hr},`, "bright"],
+        [`      "gatewayId": "${gw}",`, "bright"],
+        [`      "timestamp": "${finalTimestamp}",`, "bright"],
+        [`      "bypassSqliShield": ${bypass}`, "bright"],
+        ["    }", "bright"],
+        ["", "dim"],
+        ["    >>> Request dispatched to Next.js API route handler...", "info"],
+      ],
+      40
+    );
+    await pause(500);
+
+    // ── STEP 4: SECURITY PIPELINE ─────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 4] BACKEND SECURITY PIPELINE  —  6-LAYER VERIFICATION", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+        ["    Request received by server. Initializing security layers...", "default"],
+      ],
+      55
+    );
+    await pause(400);
+
+    // Actually call the API
+    let result;
+    try {
+      result = await sendDeviceData(dev, hr, gw, bypass, token, finalTimestamp);
+    } catch (err) {
+      await printBatch([
+        ["", "dim"],
+        [`    NETWORK ERROR: ${err.message}`, "error"],
+        ["    >>> Transmission failed. Check server connection.", "error"],
+      ]);
+      setIsRunning(false);
+      return;
+    }
+
+    const checks = result.checks || {};
+
+    // ── Layer 1: IAM ────────────────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    |  LAYER 1: Identity & Access Management (IAM)                |", "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    Validating Authorization bearer token...", "default"],
+        [`    Token: ${token ? token.substring(0, 40) + (token.length > 40 ? "..." : "") : "(empty)"}`, "dim"],
+      ],
+      65
+    );
+    await pause(150);
+    await printBatch([
+      [`    >>> ${statusIcon(checks.auth?.status)}: ${checks.auth?.detail || "No details."}`, statusColor(checks.auth?.status)],
+    ], 0);
+    await pause(250);
+
+    // ── Layer 2: Anti-Replay ────────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    |  LAYER 2: Anti-Replay Protection (Timestamp Validation)     |", "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        [`    Client timestamp:  ${finalTimestamp}`, "default"],
+        [`    Server timestamp:  ${new Date().toISOString()}`, "default"],
+      ],
+      65
+    );
+    await pause(150);
+    await printBatch([
+      [`    >>> ${statusIcon(checks.timestamp?.status)}: ${checks.timestamp?.detail || "No details."}`, statusColor(checks.timestamp?.status)],
+    ], 0);
+    await pause(250);
+
+    // ── Layer 3: SQL Injection ──────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    |  LAYER 3: SQL Injection Shield (Input Sanitization)          |", "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        [`    Scanning deviceId:  "${dev}"`, "default"],
+        [`    Scanning gatewayId: "${gw}"`, "default"],
+        ["    Regex pattern:     /['\\\"]|--|;|union|select|insert|drop|or\\s+1\\s*=\\s*1/i", "dim"],
+      ],
+      65
+    );
+    await pause(150);
+    await printBatch([
+      [`    >>> ${statusIcon(checks.sqli?.status)}: ${checks.sqli?.detail || "No details."}`, statusColor(checks.sqli?.status)],
+    ], 0);
+    await pause(250);
+
+    // ── Layer 4: Rate Limiter ───────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    |  LAYER 4: Rate Limiter (DoS Flood Prevention)               |", "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    Checking request frequency against per-device rate limit...", "default"],
+        ["    Minimum interval: 800ms between consecutive writes", "dim"],
+      ],
+      65
+    );
+    await pause(150);
+    await printBatch([
+      [`    >>> ${statusIcon(checks.rateLimit?.status)}: ${checks.rateLimit?.detail || "No details."}`, statusColor(checks.rateLimit?.status)],
+    ], 0);
+    await pause(250);
+
+    // ── Layer 5: Medical Range ──────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    |  LAYER 5: Medical Range Validation (Spoofing Detection)      |", "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        [`    Heart rate value:   ${hr} BPM`, "default"],
+        ["    Acceptable range:  30 - 220 BPM (Human survival limits)", "dim"],
+      ],
+      65
+    );
+    await pause(150);
+    await printBatch([
+      [`    >>> ${statusIcon(checks.range?.status)}: ${checks.range?.detail || "No details."}`, statusColor(checks.range?.status)],
+    ], 0);
+    await pause(250);
+
+    // ── Layer 6: Anomaly Detection ──────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    |  LAYER 6: Anomaly Detection (Statistical Baseline)           |", "info"],
+        ["    +--------------------------------------------------------------+", "dim"],
+        ["    Comparing reading against device historical rolling average...", "default"],
+        ["    Anomaly threshold: +/- 40 BPM delta from baseline", "dim"],
+      ],
+      65
+    );
+    await pause(150);
+    await printBatch([
+      [`    >>> ${statusIcon(checks.anomaly?.status)}: ${checks.anomaly?.detail || "No details."}`, statusColor(checks.anomaly?.status)],
+    ], 0);
+    await pause(350);
+
+    // ── STEP 5: SQL COMPILATION ───────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 5] DATABASE QUERY COMPILATION", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+        ["", "dim"],
+        ["    Engine:  PostgreSQL via Supabase Client SDK", "default"],
+        ["    Method:  Prepared Parameterized Statement (NOT string concatenation)", "default"],
+        ["", "dim"],
+        ["    --- VULNERABLE QUERY (String Interpolation - NOT USED) -----------", "error"],
+        [`    INSERT INTO public.logs ("deviceId","heartRate","decision")`, "error"],
+        [`    VALUES ('${dev}', ${hr}, '${result.status}');`, "error"],
+        ["    ^ User input is injected directly as executable SQL code", "dim"],
+        ["", "dim"],
+        ["    --- SECURE QUERY (Parameterized Binding - ACTIVE) ----------------", "success"],
+        ["    PREPARE stmt(text, numeric, text) AS", "success"],
+        ['    INSERT INTO public.logs ("deviceId","heartRate","decision")', "success"],
+        ["    VALUES ($1, $2, $3);", "success"],
+        ["", "dim"],
+        [`    EXECUTE stmt('${dev}', ${hr}, '${result.status}');`, "success"],
+        ["    ^ Inputs are bound as safe data literals — injection is inert", "dim"],
+      ],
+      45
+    );
+    await pause(350);
+
+    // ── STEP 6: DATABASE COMMIT ───────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 6] DATABASE COMMIT", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+      ],
+      50
+    );
+
+    if (result.reachedHospitalServer) {
+      await printBatch(
+        [
+          ["    Table:        public.logs", "default"],
+          ["    Operation:    INSERT", "default"],
+          [`    Protection:   ${result.dbProtectionType || "Parameterized Query (Safe)"}`, "default"],
+          ["", "dim"],
+          [`    Row:  { deviceId: "${dev}", heartRate: ${hr}, decision: "${result.status}" }`, "bright"],
+          ["", "dim"],
+          ["    >>> COMMITTED SUCCESSFULLY — Record written to hospital database", "success"],
+        ],
+        55
+      );
+    } else {
+      await printBatch(
+        [
+          ["    Operation:    NONE (Write blocked by security pipeline)", "default"],
+          [`    Blocked at:   ${result.stage}`, "default"],
+          [`    Reason:       ${result.reason}`, "default"],
+          ["", "dim"],
+          ["    >>> ISOLATED — No database write executed. Threat contained.", "error"],
+        ],
+        55
+      );
+    }
+    await pause(350);
+
+    // ── STEP 7: HTTP RESPONSE ─────────────────────────────────
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  [STEP 7] HTTP RESPONSE  —  RETURNED TO CLIENT", "header"],
+        ["  ─────────────────────────────────────────────────────────────────────", "dim"],
+        ["", "dim"],
+        [
+          `    HTTP/1.1 ${result.status === "BLOCKED" ? "400 Bad Request" : "200 OK"}`,
+          result.status === "BLOCKED" ? "error" : "success",
+        ],
+        ['    x-hospital-shield-decision: "' + result.status + '"', "dim"],
+        ["", "dim"],
+        ["    Response Body:", "default"],
+        ["    {", "bright"],
+        [`      "status": "${result.status}",`, "bright"],
+        [`      "reason": "${result.reason}",`, "bright"],
+        [`      "stage": "${result.stage}",`, "bright"],
+        [`      "reachedHospitalServer": ${result.reachedHospitalServer},`, "bright"],
+        [`      "dbProtectionType": "${result.dbProtectionType || "N/A"}"`, "bright"],
+        ["    }", "bright"],
+      ],
+      40
+    );
+    await pause(350);
+
+    // ── VERDICT BANNER ────────────────────────────────────────
+    const passedCount = Object.values(checks).filter(
+      (c) => c.status === "PASSED" || c.status === "BYPASSED"
+    ).length;
+    const totalChecks = Object.keys(checks).length;
+
+    const verdictColor =
+      result.status === "BLOCKED" ? "error" : result.status === "FLAGGED" ? "warning" : "success";
+    const verdictLabel =
+      result.status === "BLOCKED"
+        ? "BLOCKED"
+        : result.status === "FLAGGED"
+        ? "FLAGGED (ALLOWED WITH WARNING)"
+        : "APPROVED";
+
+    await printBatch(
+      [
+        ["", "dim"],
+        ["  =======================================================================", "dim"],
+        [`   VERDICT:          ${verdictLabel}`, verdictColor],
+        [`   Layers Passed:    ${passedCount}/${totalChecks}`, "default"],
+        [
+          `   Database Write:   ${result.reachedHospitalServer ? "YES (" + (result.dbProtectionType || "Parameterized") + ")" : "NO (Isolated)"}`,
+          "default",
+        ],
+        [
+          `   Blocked At:       ${result.status === "BLOCKED" ? result.stage : "N/A — All layers cleared"}`,
+          result.status === "BLOCKED" ? "error" : "dim",
+        ],
+        ["  =======================================================================", "dim"],
+        ["", "dim"],
+        ["  Awaiting next transmission...", "dim"],
+        ["", "dim"],
+      ],
+      40
+    );
+
+    setIsRunning(false);
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      
-      {/* SECTION 1: SCENARIO SELECTOR */}
-      <div className="bg-white border-b border-slate-200 p-4 shrink-0 overflow-x-auto shadow-sm relative z-20">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-3">
-             <h2 className="text-sm font-extrabold text-slate-500 uppercase tracking-wider">RITA Simulator — Select Threat Scenario</h2>
-          </div>
-          <div className="flex gap-3">
-            {SCENARIOS.map(s => (
-              <button
-                key={s.id}
-                onClick={() => handleSelect(s)}
-                className={`flex flex-col items-start p-3 rounded-lg border text-left min-w-[200px] transition-colors shadow-sm ${
-                  selectedScenario.id === s.id 
-                    ? `bg-${s.color}-50 border-${s.color}-400 shadow-[0_0_10px_rgba(var(--color-${s.color}-500),0.1)]` 
-                    : 'bg-white border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`w-2 h-2 rounded-full bg-${s.color}-500`} />
-                  <span className={`font-bold text-${s.color}-700 text-sm`}>{s.name}</span>
-                </div>
-                <span className="text-xs text-slate-500 font-medium">{s.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+  // ═══════════════════════════════════════════════════════════════
+  //  PRESET HANDLER
+  // ═══════════════════════════════════════════════════════════════
+  const DEFAULTS = {
+    deviceId: "DEV-IOT-102",
+    heartRate: 72,
+    gatewayId: "GW-EDGE-01",
+    authToken: "Bearer iomt_secure_device_secret_token_1",
+    timeMode: "current",
+    bypassShield: false,
+  };
 
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* SECTION 2: ATTACK NARRATIVE PANEL */}
-        <div className="w-[40%] bg-white border-r border-slate-200 overflow-y-auto p-6 shadow-sm z-10">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-black text-slate-900">{selectedScenario.name}</h2>
-            <span className={`px-2 py-1 rounded text-xs font-bold bg-${selectedScenario.color}-100 text-${selectedScenario.color}-700 border border-${selectedScenario.color}-300`}>
-              {selectedScenario.narrative.riskLevel}
+  const resetForm = () => {
+    setDeviceId(DEFAULTS.deviceId);
+    setHeartRate(DEFAULTS.heartRate);
+    setGatewayId(DEFAULTS.gatewayId);
+    setAuthToken(DEFAULTS.authToken);
+    setTimeMode(DEFAULTS.timeMode);
+    setBypassShield(DEFAULTS.bypassShield);
+  };
+
+  const runPreset = (preset) => {
+    // Temporarily show preset values in the form during execution
+    setDeviceId(preset.config.deviceId);
+    setHeartRate(preset.config.heartRate);
+    setGatewayId(preset.config.gatewayId);
+    setAuthToken(preset.config.authToken);
+    setTimeMode(preset.config.timeMode);
+    setBypassShield(preset.config.bypassShield);
+    // Execute with explicit values, then reset form to defaults after
+    executeTransmission(preset.config).then(() => resetForm());
+  };
+
+  const handleManualExecute = () => {
+    executeTransmission();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !isRunning) handleManualExecute();
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  //  RENDER
+  // ═══════════════════════════════════════════════════════════════
+  return (
+    <div className="min-h-screen bg-[#080c14] flex flex-col">
+      {/* ── CONTROL PANEL (Input Bar) ─────────────────────────── */}
+      <div className="bg-[#0d1117] border-b border-[#1c2333] px-4 py-4 shrink-0">
+        {/* Title */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-rose-500/80" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+            </div>
+            <h1 className="text-sm font-bold text-slate-300 tracking-wide font-mono">
+              Telemetry Console
+            </h1>
+            <span className="text-[9px] font-mono text-slate-600 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/50">
+              v1.0.0
             </span>
           </div>
-
-          <div className="space-y-6 text-sm">
-            
-            {/* THREAT PROFILE */}
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-bold text-slate-700">
-                THREAT PROFILE
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-bold">Attacker:</span>
-                  <span className="text-slate-800 font-medium">{selectedScenario.narrative.attacker}</span>
-                </div>
-                <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-bold">Objective:</span>
-                  <span className="text-slate-800 font-medium">{selectedScenario.narrative.objective}</span>
-                </div>
-                <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-bold">Method:</span>
-                  <span className="text-slate-800 font-medium">{selectedScenario.narrative.method}</span>
-                </div>
-                <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-slate-500 font-bold">Entry Point:</span>
-                  <span className="text-slate-800 font-mono text-xs bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded font-bold">{selectedScenario.narrative.entryPoint}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ATTACK EXPLANATION */}
-            <div>
-              <h3 className="text-slate-500 font-bold mb-2 uppercase text-xs tracking-wider">How the attack works</h3>
-              <p className="text-slate-700 leading-relaxed font-medium">
-                {selectedScenario.narrative.explanation}
-              </p>
-            </div>
-
-            {/* DEFENSE MECHANISM */}
-            <div className="bg-cyan-50/50 rounded-lg border border-cyan-200 shadow-sm overflow-hidden">
-               <div className="bg-cyan-100/50 px-4 py-2 border-b border-cyan-200 font-bold text-cyan-800">
-                DEFENSE MECHANISM
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-cyan-700 font-bold">Layer:</span>
-                  <span className="text-cyan-900 font-bold">{selectedScenario.narrative.defenseName}</span>
-                </div>
-                <div className="grid grid-cols-[100px_1fr] gap-2">
-                  <span className="text-cyan-700 font-bold">Technology:</span>
-                  <span className="text-cyan-900 font-bold">{selectedScenario.narrative.defenseTech}</span>
-                </div>
-                <div className="mt-2 text-cyan-800 leading-relaxed font-medium">
-                  <p className="mb-2"><span className="font-bold text-cyan-900">How:</span> {selectedScenario.narrative.defenseHow}</p>
-                  <p><span className="font-bold text-cyan-900">Second Line:</span> {selectedScenario.narrative.secondLine}</p>
-                </div>
-              </div>
-            </div>
-
+          <div className="flex items-center gap-2">
+            {isRunning && (
+              <span className="text-[10px] font-mono text-amber-400 flex items-center gap-1.5 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                TRANSMITTING...
+              </span>
+            )}
+            {!isRunning && (
+              <span className="text-[10px] font-mono text-emerald-500 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                IDLE
+              </span>
+            )}
           </div>
         </div>
 
-        {/* SECTION 3: LIVE API FLOW */}
-        <div className="flex-1 bg-slate-50 p-8 overflow-y-auto flex flex-col relative">
-          
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">RITA — Live API Visualization</h2>
-            <button 
-              onClick={runScenario}
-              disabled={status === "running"}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-md disabled:opacity-50 transition-colors"
+        {/* Row 1: Device ID, Heart Rate, Gateway ID */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2" onKeyDown={handleKeyDown}>
+          <div>
+            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+              Device ID
+            </label>
+            <input
+              type="text"
+              value={deviceId}
+              onChange={(e) => setDeviceId(e.target.value)}
+              className="w-full bg-[#161b22] border border-[#2a3040] text-emerald-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
+              placeholder="e.g. DEV-IOT-102"
+            />
+          </div>
+          <div>
+            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+              Heart Rate (BPM)
+            </label>
+            <input
+              type="number"
+              value={heartRate}
+              onChange={(e) => setHeartRate(Number(e.target.value))}
+              className="w-full bg-[#161b22] border border-[#2a3040] text-emerald-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
+              placeholder="e.g. 72"
+            />
+          </div>
+          <div>
+            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+              Gateway ID
+            </label>
+            <input
+              type="text"
+              value={gatewayId}
+              onChange={(e) => setGatewayId(e.target.value)}
+              className="w-full bg-[#161b22] border border-[#2a3040] text-emerald-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
+              placeholder="e.g. GW-EDGE-01"
+            />
+          </div>
+        </div>
+
+        {/* Row 2: Auth Token */}
+        <div className="mb-2" onKeyDown={handleKeyDown}>
+          <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+            Authorization Token
+          </label>
+          <input
+            type="text"
+            value={authToken}
+            onChange={(e) => setAuthToken(e.target.value)}
+            className="w-full bg-[#161b22] border border-[#2a3040] text-amber-300/80 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-colors placeholder-slate-600"
+            placeholder="Bearer ..."
+          />
+        </div>
+
+        {/* Row 3: Timestamp Mode | Bypass Toggle | Execute */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 mb-3" onKeyDown={handleKeyDown}>
+          <div className="flex-1">
+            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1 block">
+              Timestamp Mode
+            </label>
+            <select
+              value={timeMode}
+              onChange={(e) => setTimeMode(e.target.value)}
+              className="w-full bg-[#161b22] border border-[#2a3040] text-slate-300 font-mono text-xs rounded-lg px-3 py-2 focus:border-cyan-500/60 focus:outline-none cursor-pointer transition-colors"
             >
-              {status === "running" ? "Transmitting..." : "Run Scenario"}
-            </button>
+              <option value="current">Current Server Time (Valid)</option>
+              <option value="replay">Replayed Packet (10 Min Old)</option>
+              <option value="future">Future Clock Drift (10 Min Ahead)</option>
+              <option value="invalid">Malformed Format (Invalid)</option>
+            </select>
           </div>
 
-          {/* Flow Diagram */}
-          <div className="flex items-center justify-between mb-12 px-4 relative">
-            {/* Connecting lines */}
-            <div className="absolute top-1/2 left-12 right-12 h-1 bg-slate-200 -z-10 -translate-y-1/2" />
-            
-            <PipelineNode id="device" label="IoMT Device" active={pipelineState === "device"} />
-            <PipelineNode id="edge" label="Edge Gateway" active={pipelineState === "edge"} />
-            <PipelineNode id="api" label="API Endpoint" active={pipelineState === "api"} />
-            
-            <PipelineNode 
-              id="security" 
-              label="Security Pipeline" 
-              active={pipelineState === "security"} 
-              error={apiResult?.status === "BLOCKED"}
-            />
-            
-            <PipelineNode 
-              id="database" 
-              label="PostgreSQL DB" 
-              active={pipelineState === "database" && apiResult?.status !== "BLOCKED"} 
-              error={apiResult?.status === "BLOCKED"}
-            />
+          <div className="flex items-center gap-3 px-3 py-2 bg-[#161b22] border border-[#2a3040] rounded-lg shrink-0">
+            <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">
+              Bypass SQLi Shield
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={bypassShield}
+                onChange={(e) => setBypassShield(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-500 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan-600" />
+            </label>
           </div>
 
-          {/* Results Area */}
-          {apiResult && (
-            <div className="grid grid-cols-2 gap-6 mt-4">
-              
-              {/* Security Checks Detail */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-lg p-4">
-                <h3 className="text-sm font-bold text-slate-600 mb-3 border-b border-slate-100 pb-2">Security Pipeline Analysis</h3>
-                <div className="space-y-2">
-                  {apiResult.checks && Object.entries(apiResult.checks).map(([key, check]) => (
-                    <div key={key} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-bold">{key.toUpperCase()}</span>
-                      <span className={`font-mono font-bold px-2 py-0.5 rounded ${
-                        check.status === "PASSED" ? "bg-emerald-100 text-emerald-700" :
-                        check.status === "FAILED" ? "bg-rose-100 text-rose-700" :
-                        check.status === "BYPASSED" ? "bg-amber-100 text-amber-700" : "text-slate-500"
-                      }`}>
-                        {check.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Final Verdict */}
-              <div className={`border shadow-sm rounded-lg p-4 flex flex-col justify-center ${
-                apiResult.status === "BLOCKED" ? "bg-rose-50 border-rose-200" :
-                apiResult.status === "FLAGGED" ? "bg-amber-50 border-amber-200" :
-                "bg-emerald-50 border-emerald-200"
-              }`}>
-                <h3 className="text-xs font-bold uppercase tracking-wider mb-1 text-slate-500">System Verdict</h3>
-                <div className={`text-2xl font-black mb-2 ${
-                  apiResult.status === "BLOCKED" ? "text-rose-600" :
-                  apiResult.status === "FLAGGED" ? "text-amber-600" : "text-emerald-600"
-                }`}>
-                  {apiResult.status}
-                </div>
-                <div className="text-sm text-slate-700 mb-1 font-medium">
-                  <span className="font-bold text-slate-900">Reason:</span> {apiResult.reason}
-                </div>
-                <div className="text-sm text-slate-700 font-medium">
-                  <span className="font-bold text-slate-900">Database:</span> {apiResult.reachedHospitalServer ? 
-                    <span className="text-emerald-600 font-bold">Record committed ({apiResult.dbProtectionType || 'Parameterized'})</span> : 
-                    <span className="text-rose-600 font-bold">Write blocked (Threat isolated)</span>
-                  }
-                </div>
-              </div>
-            </div>
-          )}
-
+          <button
+            onClick={handleManualExecute}
+            disabled={isRunning}
+            className="px-6 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] shrink-0 tracking-wider shadow-lg shadow-cyan-900/30"
+          >
+            {isRunning ? "RUNNING..." : "EXECUTE"}
+          </button>
         </div>
+
+        {/* Row 4: Preset chips */}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="text-[9px] font-mono text-slate-600 self-center mr-1">PRESETS:</span>
+          {PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => runPreset(p)}
+              disabled={isRunning}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border ${p.border} bg-[#161b22] text-[10px] font-mono font-semibold ${p.text} transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#1c2333] active:scale-[0.97]`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${p.dot}`} />
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── CONSOLE OUTPUT ────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto bg-[#080c14] px-2 py-3 font-mono text-[11px] leading-[1.65] select-text relative">
+        {/* Scanline overlay for terminal feel */}
+        <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)] z-10" />
+
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+          }
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .console-line {
+            animation: fadeSlideIn 0.15s ease-out;
+          }
+        `}} />
+
+        <div className="relative z-0">
+          {lines.map((line) => (
+            <div key={line.id} className={`console-line ${COLOR_MAP[line.color] || COLOR_MAP.default} whitespace-pre-wrap break-all min-h-[1em]`}>
+              {line.text}
+            </div>
+          ))}
+          {/* Blinking cursor */}
+          <div className="flex items-center gap-0 mt-0.5">
+            <span className="text-emerald-500/70">{'>'}</span>
+            <span
+              className="inline-block w-[7px] h-[14px] bg-emerald-400/80 ml-1"
+              style={{ animation: 'blink 1s step-end infinite' }}
+            />
+          </div>
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* ── FOOTER BAR ────────────────────────────────────────── */}
+      <div className="bg-[#0d1117] border-t border-[#1c2333] px-4 py-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <span className="text-[10px] font-mono text-slate-600">
+            {lines.length} lines | {txCount} transmission{txCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <button
+          onClick={clearConsole}
+          className="text-[10px] font-mono text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded hover:bg-slate-800/50"
+        >
+          Clear Console
+        </button>
       </div>
     </div>
   );
