@@ -193,7 +193,7 @@ export default function SimulatorPage() {
 
     for (const layer of layers) {
       setActiveLayerScan(layer.id);
-      await sleep(400); 
+      await sleep(150); 
       if (checks[layer.id] && checks[layer.id].status === "FAILED") {
         blockedLayer = layer;
         break;
