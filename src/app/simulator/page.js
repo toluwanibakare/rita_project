@@ -5,10 +5,10 @@ import { sendDeviceData, fetchLogs } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { 
   Activity, Router, Shield, Server, Database, AlertTriangle, 
-  CheckCircle, XCircle, ActivitySquare, Cpu, Lock
+  CheckCircle, XCircle, ActivitySquare, Cpu, Lock, Terminal, FileCode2
 } from "lucide-react";
 
-// ─── Preset Scenarios ──────────────────────────────────────────────
+// ─── Preset Scenarios & Explanations ──────────────────────────────
 const PRESETS = [
   {
     id: "normal",
@@ -39,7 +39,6 @@ const PRESETS = [
       deviceId: "DEV-IOT-102", heartRate: 72, gatewayId: "GW-EDGE-01",
       authToken: "Bearer iomt_secure_device_secret_token_1", timeMode: "current", bypassShield: false,
     },
-    // For DoS, we might just trigger the same API twice instantly to hit the rate limiter
     isDos: true,
   },
   {
@@ -64,25 +63,78 @@ const PRESETS = [
   },
 ];
 
+const EXPLANATIONS = {
+  normal: {
+    q1: "Normal traffic enters the system safely as a properly structured JSON payload originating from an authorized wearable device.",
+    q2: "No attack is detected. The packet successfully passes all 6 security layers inside the API Engine.",
+    q3: "The backend accepts the request because it passed rate limits, physiological bounds, and structural checks.",
+    q4: "The API gateway passively monitors the request and allows it to proceed, updating the moving average baselines.",
+    q5: "Before reaching the database, the Node.js application server formats the data and prepares parameterized SQL statements.",
+    q6: "Since this is safe traffic, the absence of protection would have no adverse effect.",
+    q7: "In IoMT systems, continuous, uninterrupted flow of safe physiological data is critical for real-time patient monitoring.",
+    q8: "The API layer acts as the front door. By inspecting normal traffic here, we guarantee only clean data ever touches medical records."
+  },
+  sqli: {
+    q1: "The attacker intercepts the edge device transmission and injects malicious SQL characters (' OR 1=1 --) into the deviceId field.",
+    q2: "The attack is detected at Layer 3 (SQLi Detection) inside the API Security Engine via regex and input sanitization.",
+    q3: "The backend server instantly drops the request. It never attempts to parse or execute the malicious string.",
+    q4: "The API gateway blocks the payload, returns an HTTP 400 Bad Request to the attacker, and logs the event.",
+    q5: "The request is completely destroyed. The database is never queried, and no connection pool is wasted.",
+    q6: "Without this shield, the SQL command would execute, potentially wiping patient records or granting unauthorized access.",
+    q7: "IoMT edge nodes are often physically accessible and easily compromised. Zero-trust API validation is required.",
+    q8: "Since the database cannot distinguish between legitimate edge nodes and compromised ones, the API must filter everything first."
+  },
+  dos: {
+    q1: "A compromised device floods the network with thousands of rapid-fire telemetry requests to exhaust server resources.",
+    q2: "Detected at Layer 4 (Rate Limiter) when the API notices multiple requests arriving in under 800 milliseconds.",
+    q3: "The backend is protected from CPU exhaustion and database connection pool starvation.",
+    q4: "The API gateway begins dropping excess packets instantly (HTTP 429 Too Many Requests), protecting downstream servers.",
+    q5: "The malicious packets are discarded at the edge of the API, keeping the database totally isolated from the flood.",
+    q6: "The hospital database would crash under the load, causing a system-wide denial of service for all monitoring stations.",
+    q7: "Medical networks often have limited bandwidth. A single hijacked device can easily flood a hospital network.",
+    q8: "The API layer is the only choke point capable of absorbing and discarding high-volume traffic before it crashes internal systems."
+  },
+  spoof: {
+    q1: "An attacker sends structurally valid JSON, but with an impossible physiological value (e.g., 999 BPM) to trigger false alarms.",
+    q2: "Detected at Layer 5 (Medical Validation). The API checks the value against human survival bounds (30 - 220 BPM).",
+    q3: "The backend rejects the data to maintain clinical integrity and prevent alarm fatigue for nurses.",
+    q4: "The API gateway parses the physiological payload, spots the discrepancy, and blocks the insertion.",
+    q5: "The request is dropped. The fake data never corrupts the patient's historical medical timeline.",
+    q6: "Doctors would receive critical false alarms, potentially leading to incorrect emergency treatments or alarm fatigue.",
+    q7: "Wearable sensors can malfunction or be tampered with. The system must never trust raw sensor data blindly.",
+    q8: "By enforcing clinical rules at the API layer, we keep the database purely focused on storage, not medical logic validation."
+  },
+  anomaly: {
+    q1: "The attacker subtly alters the telemetry data (e.g., jumping from 80 to 150 BPM) to mimic a cardiac event.",
+    q2: "Detected at Layer 6 (Statistical Anomaly). The API computes a moving average and flags sudden, unnatural deviations.",
+    q3: "The backend flags the data rather than blocking it, ensuring doctors can review suspicious but potentially real medical events.",
+    q4: "The API gateway runs a lightweight algorithm to compare the new packet against historical baselines.",
+    q5: "The request is marked as 'FLAGGED' and then inserted into the database for clinical review.",
+    q6: "Subtle data manipulation attacks would go unnoticed, potentially leading to slow poisoning of medical datasets.",
+    q7: "In healthcare, anomalies can mean either an attack or a dying patient. Both require immediate attention.",
+    q8: "The API is the best place to run real-time statistical buffers, as it sees all data before it is committed."
+  }
+};
+
 // ─── Main Component ────────────────────────────────────────────────
 export default function SimulatorPage() {
   const [activeStage, setActiveStage] = useState("IDLE"); // IDLE, WEARABLE, EDGE, API, API_SCAN, BACKEND, DB, BLOCKED
-  const [packetState, setPacketState] = useState(null); // { type: 'safe'|'malicious', payload: ... }
-  const [apiVerdict, setApiVerdict] = useState(null); // Result from backend { status, layer, reason }
+  const [packetState, setPacketState] = useState(null); // { type: 'safe'|'malicious', preset: ... }
+  const [apiVerdict, setApiVerdict] = useState(null); // { status, layer, reason }
   const [logs, setLogs] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [activeLayerScan, setActiveLayerScan] = useState(null);
+  const [activePresetId, setActivePresetId] = useState("normal");
 
-  // Fetch initial logs for SOC dashboard
+  // Fetch logs
   useEffect(() => {
     fetchLogs().then(data => {
-      if (data?.logs) setLogs(data.logs.slice(0, 8));
+      if (data?.logs) setLogs(data.logs.slice(0, 6));
     });
     
-    // Subscribe to DB inserts
     const channel = supabase.channel("simulator-soc")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "logs" }, (payload) => {
-        setLogs(prev => [payload.new, ...prev].slice(0, 8));
+        setLogs(prev => [payload.new, ...prev].slice(0, 6));
       }).subscribe();
     return () => supabase.removeChannel(channel);
   }, []);
@@ -93,6 +145,7 @@ export default function SimulatorPage() {
   const runSimulation = async (preset) => {
     if (isSimulating) return;
     setIsSimulating(true);
+    setActivePresetId(preset.id);
     setApiVerdict(null);
     setActiveLayerScan(null);
 
@@ -111,17 +164,14 @@ export default function SimulatorPage() {
     setActiveStage("API");
     await sleep(500);
 
-    // 4. API Scanning (The Engine)
+    // 4. API Scanning
     setActiveStage("API_SCAN");
     
-    // Call the real backend to get the actual results
     let result;
     try {
       if (preset.isDos) {
-        // Trigger it once to set the timer, then again immediately to hit the limit
         await sendDeviceData(preset.config.deviceId, preset.config.heartRate, preset.config.gatewayId, preset.config.bypassShield, preset.config.authToken, new Date().toISOString());
       }
-      
       const ts = preset.config.timeMode === "current" ? new Date().toISOString() : "2020-01-01T00:00:00.000Z";
       result = await sendDeviceData(preset.config.deviceId, preset.config.heartRate, preset.config.gatewayId, preset.config.bypassShield, preset.config.authToken, ts);
     } catch (e) {
@@ -129,8 +179,6 @@ export default function SimulatorPage() {
     }
 
     const checks = result.checks || {};
-    
-    // Visually scan through the layers
     const layers = [
       { id: "auth", name: "IAM Authorization" },
       { id: "timestamp", name: "Anti-Replay" },
@@ -145,7 +193,7 @@ export default function SimulatorPage() {
 
     for (const layer of layers) {
       setActiveLayerScan(layer.id);
-      await sleep(400); // Time to scan each layer
+      await sleep(400); 
       if (checks[layer.id] && checks[layer.id].status === "FAILED") {
         blockedLayer = layer;
         break;
@@ -153,32 +201,19 @@ export default function SimulatorPage() {
     }
 
     if (result.status === "BLOCKED") {
-      // 5a. Blocked!
       setActiveStage("BLOCKED");
-      setApiVerdict({
-        status: "BLOCKED",
-        layer: blockedLayer?.name || result.stage,
-        reason: finalReason
-      });
+      setApiVerdict({ status: "BLOCKED", layer: blockedLayer?.name || result.stage, reason: finalReason });
       await sleep(2000);
     } else {
-      // 5b. Passed!
       setActiveLayerScan("PASSED");
       await sleep(500);
-      
       setActiveStage("BACKEND");
       await sleep(800);
-
       setActiveStage("DB");
-      setApiVerdict({
-        status: "PASSED",
-        layer: "Database",
-        reason: "Data safely inserted."
-      });
+      setApiVerdict({ status: "PASSED", layer: "Database", reason: "Data safely inserted." });
       await sleep(1500);
     }
 
-    // Reset
     setActiveStage("IDLE");
     setPacketState(null);
     setApiVerdict(null);
@@ -186,28 +221,22 @@ export default function SimulatorPage() {
     setIsSimulating(false);
   };
 
-  const runMixedTraffic = async () => {
-    if (isSimulating) return;
-    await runSimulation(PRESETS.find(p => p.id === "normal"));
-    await sleep(1000);
-    await runSimulation(PRESETS.find(p => p.id === "sqli"));
-    await sleep(1000);
-    await runSimulation(PRESETS.find(p => p.id === "anomaly"));
-  };
+  const activeExplanation = EXPLANATIONS[activePresetId] || EXPLANATIONS.normal;
+  const activePresetConfig = PRESETS.find(p => p.id === activePresetId)?.config || PRESETS[0].config;
 
-  // ─── Render Helpers ─────────────────────────────────────────────
+  // ─── Render Helpers (LIGHT THEME) ────────────────────────────────
   const getNodeColor = (nodeId) => {
-    if (activeStage === "BLOCKED" && nodeId === "API") return "border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.6)] bg-rose-950/40 text-rose-400";
+    if (activeStage === "BLOCKED" && nodeId === "API") return "border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)] bg-rose-50 text-rose-600";
     if (activeStage === nodeId || (nodeId === "API" && activeStage === "API_SCAN")) {
       return packetState?.type === "malicious" 
-        ? "border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.4)] bg-[#1c2333] text-rose-400"
-        : "border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] bg-[#1c2333] text-cyan-300";
+        ? "border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)] bg-white text-rose-600"
+        : "border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-white text-emerald-600";
     }
-    return "border-slate-700 bg-[#0d1117] text-slate-400";
+    return "border-slate-200 bg-white text-slate-500 shadow-sm";
   };
 
   return (
-    <div className="min-h-screen bg-[#080c14] flex flex-col text-slate-300 font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800 font-sans">
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes flowRight {
           0% { transform: translateX(0); opacity: 0; }
@@ -217,16 +246,16 @@ export default function SimulatorPage() {
         }
         @keyframes bounceBack {
           0% { transform: translateX(0); opacity: 1; }
-          40% { transform: translateX(-30px) scale(1.2); opacity: 1; background-color: #f43f5e; }
+          40% { transform: translateX(-30px) scale(1.2); opacity: 1; background-color: #ef4444; }
           100% { transform: translateX(-150px) scale(0.5) translateY(50px); opacity: 0; }
         }
         @keyframes pulseGlow {
-          0%, 100% { box-shadow: 0 0 15px rgba(34, 211, 238, 0.2); }
-          50% { box-shadow: 0 0 35px rgba(34, 211, 238, 0.6); }
+          0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); border-color: #10b981; }
+          50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.5); border-color: #34d399; }
         }
         @keyframes pulseGlowRed {
-          0%, 100% { box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
-          50% { box-shadow: 0 0 45px rgba(244, 63, 94, 0.8); border-color: #f43f5e; }
+          0%, 100% { box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); border-color: #f43f5e; }
+          50% { box-shadow: 0 0 35px rgba(244, 63, 94, 0.6); border-color: #fb7185; }
         }
         .animate-flow { animation: flowRight 0.8s linear forwards; }
         .animate-bounce-back { animation: bounceBack 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
@@ -234,212 +263,257 @@ export default function SimulatorPage() {
         .node-active-malicious { animation: pulseGlowRed 0.5s infinite; }
       `}} />
 
-      {/* ─── HEADER & CONTROLS ────────────────────────────────────── */}
-      <div className="bg-[#0d1117] border-b border-slate-800 p-6 z-10 shrink-0">
-        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-          <Shield className="text-cyan-400" /> API Attack Visualization & Defense Simulator
-        </h1>
-        <p className="text-slate-400 text-sm mb-6 max-w-4xl">
-          This platform demonstrates how medical data moves through an IoMT environment. 
-          Select an attack below to visualize how the **API Security Layer** acts as the primary attack surface, 
-          detecting and neutralizing malicious payloads *before* they can reach the hospital database.
-        </p>
-
-        <div className="flex flex-wrap gap-3">
-          {PRESETS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => runSimulation(p)}
-              disabled={isSimulating}
-              className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-all flex flex-col items-start disabled:opacity-50
-                ${p.type === 'safe' 
-                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' 
-                  : p.type === 'suspicious' 
-                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
-                  : 'border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'}`}
-            >
-              <span>{p.label}</span>
-              <span className="text-[10px] opacity-70 font-mono">{p.desc}</span>
-            </button>
-          ))}
-          <button
-            onClick={runMixedTraffic}
-            disabled={isSimulating}
-            className="px-4 py-2 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 text-sm font-semibold transition-all flex flex-col items-start disabled:opacity-50"
-          >
-            <span>Mixed Traffic</span>
-            <span className="text-[10px] opacity-70 font-mono">Fires multiple requests</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ─── VISUAL ARCHITECTURE FLOW ─────────────────────────────── */}
-      <div className="flex-1 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#080c14] to-[#080c14] p-8 flex flex-col justify-center">
-        
-        {/* Connection Lines Background */}
-        <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-800 -translate-y-1/2 z-0" />
-
-        <div className="flex items-center justify-between relative z-10 max-w-7xl mx-auto w-full">
+      <div className="flex-1 flex overflow-hidden">
+        {/* ─── LEFT COLUMN: SIMULATOR & PAYLOAD ─────────────────────── */}
+        <div className="w-2/3 flex flex-col border-r border-slate-200 bg-slate-50">
           
-          {/* Node 1: Wearable */}
-          <div className="relative flex flex-col items-center">
-            <div className={`w-20 h-20 rounded-2xl border-2 flex items-center justify-center bg-[#0d1117] transition-all duration-300 ${getNodeColor("WEARABLE")} ${activeStage === "WEARABLE" ? "scale-110" : ""}`}>
-              <Activity className="w-8 h-8" />
-            </div>
-            <span className="mt-4 font-semibold text-sm">Wearable</span>
-            <span className="text-[10px] text-slate-500">IoMT Source</span>
-            
-            {activeStage === "WEARABLE" && (
-              <div className={`absolute top-1/2 -right-8 w-4 h-4 rounded-full -translate-y-1/2 animate-flow ${packetState?.type === 'malicious' ? 'bg-rose-500' : 'bg-emerald-400 shadow-[0_0_10px_#34d399]'}`} />
-            )}
-          </div>
-
-          {/* Node 2: Edge */}
-          <div className="relative flex flex-col items-center">
-            <div className={`w-20 h-20 rounded-2xl border-2 flex items-center justify-center bg-[#0d1117] transition-all duration-300 ${getNodeColor("EDGE")} ${activeStage === "EDGE" ? "scale-110" : ""}`}>
-              <Router className="w-8 h-8" />
-            </div>
-            <span className="mt-4 font-semibold text-sm">Gateway</span>
-            <span className="text-[10px] text-slate-500">Edge Device</span>
-
-            {activeStage === "EDGE" && (
-              <div className={`absolute top-1/2 -right-8 w-4 h-4 rounded-full -translate-y-1/2 animate-flow ${packetState?.type === 'malicious' ? 'bg-rose-500 shadow-[0_0_10px_#f43f5e]' : 'bg-emerald-400'}`} />
-            )}
-          </div>
-
-          {/* Node 3: API Security Engine (The main focus) */}
-          <div className="relative flex flex-col items-center">
-            <div className={`w-40 h-40 rounded-3xl border-4 flex flex-col items-center justify-center transition-all duration-300 ${getNodeColor("API")} ${activeStage === "API_SCAN" || activeStage === "BLOCKED" ? (packetState?.type === 'malicious' ? 'node-active-malicious scale-110' : 'node-active-safe scale-110') : ''}`}>
-              {activeStage === "BLOCKED" ? (
-                <AlertTriangle className="w-12 h-12 text-rose-500 mb-2" />
-              ) : (
-                <Shield className={`w-12 h-12 mb-2 ${activeStage === 'API_SCAN' ? 'text-cyan-400' : ''}`} />
-              )}
-              <span className="font-bold text-center leading-tight">API Security<br/>Gateway</span>
-            </div>
-            <span className="mt-4 font-semibold text-sm text-cyan-400">The Attack Surface</span>
-            
-            {/* The Layers Box */}
-            <div className="absolute top-[180px] w-64 bg-slate-900/80 border border-slate-700 rounded-lg p-3 text-[10px] font-mono shadow-2xl backdrop-blur-sm">
-              <div className="text-slate-400 mb-2 pb-1 border-b border-slate-700 font-bold">INSPECTION ENGINE</div>
-              {[
-                { id: "auth", name: "1. IAM Auth" },
-                { id: "timestamp", name: "2. Anti-Replay" },
-                { id: "sqli", name: "3. SQLi Detection" },
-                { id: "rateLimit", name: "4. Rate Limiter" },
-                { id: "range", name: "5. Med Validation" },
-                { id: "anomaly", name: "6. Anomaly Scan" }
-              ].map(layer => (
-                <div key={layer.id} className="flex justify-between items-center py-1">
-                  <span className={`${activeLayerScan === layer.id ? 'text-white font-bold' : 'text-slate-500'}`}>{layer.name}</span>
-                  {activeLayerScan === layer.id && activeStage !== "BLOCKED" && <ActivitySquare className="w-3 h-3 animate-spin text-cyan-400" />}
-                  {apiVerdict?.layer?.includes(layer.name.split(' ')[1]) && activeStage === "BLOCKED" && <XCircle className="w-3 h-3 text-rose-500" />}
-                </div>
+          {/* Controls */}
+          <div className="bg-white border-b border-slate-200 p-6 z-10 shrink-0">
+            <h1 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <Shield className="text-emerald-500 w-6 h-6" /> API Attack Visualization Simulator
+            </h1>
+            <p className="text-slate-500 text-sm mb-4">
+              Click a scenario below to visualize data flow, API inspection, and payload interception.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => runSimulation(p)}
+                  disabled={isSimulating}
+                  className={`px-3 py-1.5 rounded border text-sm font-semibold transition-all disabled:opacity-50
+                    ${activePresetId === p.id ? 'ring-2 ring-offset-1' : ''}
+                    ${p.type === 'safe' 
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-emerald-500' 
+                      : p.type === 'suspicious' 
+                      ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 ring-amber-500'
+                      : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 ring-rose-500'}`}
+                >
+                  {p.label}
+                </button>
               ))}
             </div>
+          </div>
 
-            {/* Packet animations leaving API */}
-            {activeStage === "BLOCKED" && (
-              <div className="absolute top-1/2 -left-4 w-5 h-5 bg-rose-500 rounded-sm -translate-y-1/2 animate-bounce-back flex items-center justify-center text-[8px] font-bold text-white shadow-[0_0_15px_#f43f5e]">
-                !
-              </div>
-            )}
-            {activeStage === "API_SCAN" && activeLayerScan === "PASSED" && (
-              <div className="absolute top-1/2 -right-8 w-4 h-4 rounded-full -translate-y-1/2 animate-flow bg-emerald-400 shadow-[0_0_10px_#34d399]" />
-            )}
+          {/* Visual Flow Diagram */}
+          <div className="relative flex-1 bg-slate-100/50 p-6 flex flex-col justify-center min-h-[350px]">
+            <div className="absolute top-1/2 left-10 right-10 h-1 bg-slate-300 -translate-y-1/2 z-0 rounded" />
 
-            {/* Floating Alert Box */}
-            {apiVerdict && (
-              <div className={`absolute -top-24 w-80 p-3 rounded-lg border shadow-2xl backdrop-blur-md flex flex-col items-center text-center animate-[fadeSlideIn_0.3s_ease-out] z-50
-                ${apiVerdict.status === 'BLOCKED' ? 'bg-rose-950/80 border-rose-500/50 text-rose-200' : 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'}`}>
-                <span className="font-bold text-sm uppercase tracking-wider mb-1">
-                  {apiVerdict.status === 'BLOCKED' ? 'Attack Blocked' : 'Traffic Safe'}
-                </span>
-                <span className="text-xs">{apiVerdict.reason}</span>
-                {apiVerdict.status === 'BLOCKED' && (
-                  <span className="text-[10px] mt-1 text-rose-400 font-mono block border-t border-rose-800/50 pt-1 w-full">Detected at: {apiVerdict.layer}</span>
+            <div className="flex items-center justify-between relative z-10 w-full max-w-4xl mx-auto">
+              {/* Node 1: Wearable */}
+              <div className="relative flex flex-col items-center">
+                <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all duration-300 bg-white ${getNodeColor("WEARABLE")} ${activeStage === "WEARABLE" ? "scale-110" : ""}`}>
+                  <Activity className="w-6 h-6" />
+                </div>
+                <span className="mt-2 font-semibold text-xs text-slate-700">Wearable</span>
+                {activeStage === "WEARABLE" && (
+                  <div className={`absolute top-1/2 -right-6 w-3 h-3 rounded-full -translate-y-1/2 animate-flow ${packetState?.type === 'malicious' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
                 )}
               </div>
+
+              {/* Node 2: Edge */}
+              <div className="relative flex flex-col items-center">
+                <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all duration-300 bg-white ${getNodeColor("EDGE")} ${activeStage === "EDGE" ? "scale-110" : ""}`}>
+                  <Router className="w-6 h-6" />
+                </div>
+                <span className="mt-2 font-semibold text-xs text-slate-700">Gateway</span>
+                {activeStage === "EDGE" && (
+                  <div className={`absolute top-1/2 -right-6 w-3 h-3 rounded-full -translate-y-1/2 animate-flow ${packetState?.type === 'malicious' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                )}
+              </div>
+
+              {/* Node 3: API Security */}
+              <div className="relative flex flex-col items-center">
+                <div className={`w-32 h-32 rounded-2xl border-[3px] flex flex-col items-center justify-center transition-all duration-300 bg-white ${getNodeColor("API")} ${activeStage === "API_SCAN" || activeStage === "BLOCKED" ? (packetState?.type === 'malicious' ? 'node-active-malicious scale-110' : 'node-active-safe scale-110') : ''}`}>
+                  {activeStage === "BLOCKED" ? <AlertTriangle className="w-10 h-10 text-rose-500 mb-1" /> : <Shield className={`w-10 h-10 mb-1 ${activeStage === 'API_SCAN' ? 'text-emerald-500' : ''}`} />}
+                  <span className="font-bold text-[11px] text-center leading-tight">API Security<br/>Engine</span>
+                </div>
+                
+                <div className="absolute top-[140px] w-52 bg-white border border-slate-200 rounded-lg p-2 text-[9px] font-mono shadow-xl z-20">
+                  <div className="text-slate-600 mb-1 pb-1 border-b border-slate-100 font-bold">INSPECTION ENGINE</div>
+                  {[
+                    { id: "auth", name: "1. IAM Auth" }, { id: "timestamp", name: "2. Anti-Replay" },
+                    { id: "sqli", name: "3. SQLi Detection" }, { id: "rateLimit", name: "4. Rate Limiter" },
+                    { id: "range", name: "5. Med Validation" }, { id: "anomaly", name: "6. Anomaly Scan" }
+                  ].map(layer => (
+                    <div key={layer.id} className="flex justify-between items-center py-0.5">
+                      <span className={`${activeLayerScan === layer.id ? 'text-slate-900 font-bold' : 'text-slate-500'}`}>{layer.name}</span>
+                      {activeLayerScan === layer.id && activeStage !== "BLOCKED" && <ActivitySquare className="w-3 h-3 animate-spin text-emerald-500" />}
+                      {apiVerdict?.layer?.includes(layer.name.split(' ')[1]) && activeStage === "BLOCKED" && <XCircle className="w-3 h-3 text-rose-500" />}
+                    </div>
+                  ))}
+                </div>
+
+                {activeStage === "BLOCKED" && (
+                  <div className="absolute top-1/2 -left-3 w-4 h-4 bg-rose-500 rounded-sm -translate-y-1/2 animate-bounce-back flex items-center justify-center text-[8px] font-bold text-white shadow-md">!</div>
+                )}
+                {activeStage === "API_SCAN" && activeLayerScan === "PASSED" && (
+                  <div className="absolute top-1/2 -right-6 w-3 h-3 rounded-full -translate-y-1/2 animate-flow bg-emerald-500 shadow-sm" />
+                )}
+
+                {apiVerdict && (
+                  <div className={`absolute -top-20 w-64 p-2 rounded-lg border shadow-xl flex flex-col items-center text-center animate-[fadeSlideIn_0.3s_ease-out] z-30 bg-white ${apiVerdict.status === 'BLOCKED' ? 'border-rose-200' : 'border-emerald-200'}`}>
+                    <span className={`font-bold text-xs uppercase ${apiVerdict.status === 'BLOCKED' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {apiVerdict.status === 'BLOCKED' ? 'Attack Blocked' : 'Traffic Safe'}
+                    </span>
+                    <span className="text-[10px] text-slate-600 mt-0.5">{apiVerdict.reason}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Node 4: Backend */}
+              <div className="relative flex flex-col items-center">
+                <div className={`w-16 h-16 rounded-xl border-2 flex items-center justify-center transition-all duration-300 bg-white ${getNodeColor("BACKEND")} ${activeStage === "BACKEND" ? "scale-110" : ""}`}>
+                  <Cpu className="w-6 h-6" />
+                </div>
+                <span className="mt-2 font-semibold text-xs text-slate-700">App Server</span>
+                {activeStage === "BACKEND" && (
+                  <div className="absolute top-1/2 -right-6 w-3 h-3 rounded-full bg-emerald-500 -translate-y-1/2 animate-flow shadow-sm" />
+                )}
+              </div>
+
+              {/* Node 5: Database */}
+              <div className="relative flex flex-col items-center">
+                <div className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center transition-all duration-300 bg-white ${getNodeColor("DB")} ${activeStage === "DB" ? "scale-110 shadow-[0_0_15px_rgba(16,185,129,0.3)] border-emerald-400 text-emerald-500" : ""}`}>
+                  <Database className="w-8 h-8" />
+                </div>
+                <span className="mt-2 font-semibold text-xs flex items-center gap-1 text-slate-700">
+                  <Lock className="w-3 h-3 text-emerald-500" /> Hospital DB
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Payload Inspector */}
+          <div className="h-48 bg-slate-900 border-t border-slate-800 p-4 shrink-0 flex flex-col font-mono text-[11px] text-slate-300 overflow-hidden relative">
+            <h3 className="text-emerald-400 font-bold mb-2 flex items-center gap-2 border-b border-slate-700 pb-1">
+              <Terminal className="w-3 h-3" /> Live API Payload Inspector
+            </h3>
+            {packetState ? (
+              <div className="flex gap-6 overflow-hidden">
+                <div className="flex-1">
+                  <div className="text-slate-500 mb-1">HTTP REQUEST</div>
+                  <div className="text-sky-300">POST /api/vitals HTTP/1.1</div>
+                  <div>Host: api.hospital-iomt.local</div>
+                  <div>Authorization: {activePresetConfig.authToken}</div>
+                  <div>Content-Type: application/json</div>
+                </div>
+                <div className="flex-1">
+                  <div className="text-slate-500 mb-1">JSON BODY</div>
+                  <pre className="text-amber-200/90 whitespace-pre-wrap leading-tight">
+{`{
+  "deviceId": "${activePresetConfig.deviceId}",
+  "heartRate": ${activePresetConfig.heartRate},
+  "gatewayId": "${activePresetConfig.gatewayId}",
+  "timestamp": "${new Date().toISOString()}"
+}`}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-slate-600 italic">
+                Waiting for transmission...
+              </div>
             )}
           </div>
+        </div>
 
-          {/* Node 4: Backend */}
-          <div className="relative flex flex-col items-center">
-            <div className={`w-20 h-20 rounded-2xl border-2 flex items-center justify-center bg-[#0d1117] transition-all duration-300 ${getNodeColor("BACKEND")} ${activeStage === "BACKEND" ? "scale-110" : ""}`}>
-              <Cpu className="w-8 h-8" />
-            </div>
-            <span className="mt-4 font-semibold text-sm">App Server</span>
-            <span className="text-[10px] text-slate-500">Node.js Backend</span>
-            
-            {activeStage === "BACKEND" && (
-              <div className="absolute top-1/2 -right-8 w-4 h-4 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] -translate-y-1/2 animate-flow" />
-            )}
+        {/* ─── RIGHT COLUMN: ACADEMIC DEFENSE PANEL ───────────────────── */}
+        <div className="w-1/3 bg-white flex flex-col border-b border-slate-200">
+          <div className="p-4 bg-slate-100 border-b border-slate-200 shrink-0">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <FileCode2 className="w-5 h-5 text-indigo-500" /> Academic Defense View
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">Explaining: <strong className="text-indigo-600">{PRESETS.find(p=>p.id===activePresetId)?.label}</strong></p>
           </div>
-
-          {/* Node 5: Database */}
-          <div className="relative flex flex-col items-center">
-            <div className={`w-24 h-24 rounded-2xl border-2 flex items-center justify-center bg-[#0d1117] transition-all duration-300 ${getNodeColor("DB")} ${activeStage === "DB" ? "scale-110 shadow-[0_0_20px_#34d399] border-emerald-400 text-emerald-400" : ""}`}>
-              <Database className="w-10 h-10" />
+          
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm text-slate-600">
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">1. How does the attack enter?</strong>
+              {activeExplanation.q1}
             </div>
-            <span className="mt-4 font-semibold text-sm flex items-center gap-1">
-              <Lock className="w-3 h-3 text-emerald-500" /> Hospital DB
-            </span>
-            <span className="text-[10px] text-slate-500">PostgreSQL</span>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">2. Where is it detected?</strong>
+              {activeExplanation.q2}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">3. How is the backend protected?</strong>
+              {activeExplanation.q3}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">4. How does the API mitigate it?</strong>
+              {activeExplanation.q4}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">5. Pre-database actions?</strong>
+              {activeExplanation.q5}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">6. If protection was absent?</strong>
+              {activeExplanation.q6}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">7. Application to IoMT?</strong>
+              {activeExplanation.q7}
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <strong className="block text-slate-800 mb-1">8. Why target the API layer?</strong>
+              {activeExplanation.q8}
+            </div>
           </div>
-
         </div>
       </div>
 
-      {/* ─── SOC DASHBOARD (Logs) ─────────────────────────────────── */}
-      <div className="bg-[#0d1117] border-t border-slate-800 shrink-0 h-64 flex flex-col">
-        <div className="px-6 py-3 border-b border-slate-800 flex justify-between items-center bg-[#161b22]">
-          <h3 className="font-bold text-sm flex items-center gap-2">
-            <ActivitySquare className="w-4 h-4 text-cyan-400" /> Security Operations Center (Real-Time Monitoring)
+      {/* ─── BOTTOM: SOC DASHBOARD (Logs) ───────────────────────────── */}
+      <div className="h-48 bg-white border-t border-slate-200 shrink-0 flex flex-col shadow-[0_-4px_10px_rgba(0,0,0,0.02)] z-20">
+        <div className="px-5 py-2 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <h3 className="font-bold text-xs flex items-center gap-2 text-slate-700">
+            <ActivitySquare className="w-4 h-4 text-emerald-500" /> Security Operations Center (SOC Logs)
           </h3>
-          <span className="text-xs text-slate-500 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Live
+          <span className="text-[10px] text-slate-500 font-semibold uppercase flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Feed
           </span>
         </div>
-        <div className="flex-1 overflow-auto p-4">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="flex-1 overflow-auto p-3">
+          <table className="w-full text-left border-collapse text-[11px]">
             <thead>
-              <tr className="text-slate-500 border-b border-slate-800">
-                <th className="pb-2 font-medium w-32">Timestamp</th>
-                <th className="pb-2 font-medium">Device Source</th>
-                <th className="pb-2 font-medium">Mitigation Action</th>
-                <th className="pb-2 font-medium">Detection Layer</th>
-                <th className="pb-2 font-medium">DB Status</th>
+              <tr className="text-slate-500 border-b border-slate-200">
+                <th className="pb-1.5 font-semibold w-24">Time</th>
+                <th className="pb-1.5 font-semibold">Source Payload</th>
+                <th className="pb-1.5 font-semibold">Action Taken</th>
+                <th className="pb-1.5 font-semibold">Detection Layer</th>
+                <th className="pb-1.5 font-semibold">DB Status</th>
               </tr>
             </thead>
             <tbody className="font-mono">
               {logs.map((log) => (
-                <tr key={log.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                  <td className="py-2.5 text-slate-400">
+                <tr key={log.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="py-2 text-slate-500">
                     {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}
                   </td>
-                  <td className="py-2.5 text-slate-300 truncate max-w-[150px]" title={log.deviceId}>{log.deviceId}</td>
-                  <td className="py-2.5">
+                  <td className="py-2 text-slate-700 truncate max-w-[150px]" title={log.deviceId}>{log.deviceId}</td>
+                  <td className="py-2">
                     {log.status === "BLOCKED" || log.decision === "BLOCKED" ? (
-                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold flex w-fit items-center gap-1"><XCircle className="w-3 h-3"/> BLOCKED</span>
+                      <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-bold flex w-fit items-center gap-1"><XCircle className="w-3 h-3"/> BLOCKED</span>
                     ) : log.status === "FLAGGED" || log.decision === "FLAGGED" ? (
-                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold flex w-fit items-center gap-1"><AlertTriangle className="w-3 h-3"/> FLAGGED</span>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold flex w-fit items-center gap-1"><AlertTriangle className="w-3 h-3"/> FLAGGED</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold flex w-fit items-center gap-1"><CheckCircle className="w-3 h-3"/> ACCEPTED</span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold flex w-fit items-center gap-1"><CheckCircle className="w-3 h-3"/> ACCEPTED</span>
                     )}
                   </td>
-                  <td className="py-2.5 text-slate-400">{log.stage}</td>
-                  <td className="py-2.5">
+                  <td className="py-2 text-slate-500">{log.stage}</td>
+                  <td className="py-2">
                     {log.reachedHospitalServer ? (
-                      <span className="text-emerald-500">Inserted (Safe)</span>
+                      <span className="text-emerald-600 font-semibold">Inserted (Safe)</span>
                     ) : (
-                      <span className="text-rose-500">Protected (No Write)</span>
+                      <span className="text-rose-600 font-semibold">Protected (No Write)</span>
                     )}
                   </td>
                 </tr>
               ))}
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-4 text-center text-slate-600">No network traffic detected.</td>
+                  <td colSpan={5} className="py-4 text-center text-slate-400">No network traffic detected.</td>
                 </tr>
               )}
             </tbody>
