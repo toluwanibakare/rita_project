@@ -198,11 +198,20 @@ export default function SimulatorPage() {
 
     for (const layer of layers) {
       setActiveLayerScan(layer.id);
-      await sleep(150); 
+      await sleep(300); 
       if (checks[layer.id] && checks[layer.id].status === "FAILED") {
         blockedLayer = layer;
         break;
       }
+    }
+
+    // Manually push to logs table instantly for guaranteed UI update
+    if (result && result.deviceId) {
+      setLogs(prev => {
+        const exists = prev.some(l => l.timestamp === result.timestamp);
+        if (exists) return prev;
+        return [result, ...prev].slice(0, 6);
+      });
     }
 
     if (result.status === "BLOCKED") {
@@ -220,7 +229,7 @@ export default function SimulatorPage() {
     }
 
     setActiveStage("IDLE");
-    setPacketState(null);
+    // We intentionally do NOT reset packetState here so the Live Payload Inspector remains visible
     setApiVerdict(null);
     setActiveLayerScan(null);
     setIsSimulating(false);
@@ -238,9 +247,7 @@ export default function SimulatorPage() {
   const getNodeColor = (nodeId) => {
     if (activeStage === "BLOCKED" && nodeId === "API") return "border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)] bg-rose-50 text-rose-600";
     if (activeStage === nodeId || (nodeId === "API" && activeStage === "API_SCAN")) {
-      return packetState?.type === "malicious" 
-        ? "border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)] bg-white text-rose-600"
-        : "border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-white text-emerald-600";
+      return "border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-white text-emerald-600";
     }
     return "border-slate-200 bg-white text-slate-500 shadow-sm";
   };
@@ -368,7 +375,7 @@ export default function SimulatorPage() {
 
               {/* Node 3: API Security */}
               <div className="relative flex flex-col items-center">
-                <div className={`w-32 h-32 rounded-2xl border-[3px] flex flex-col items-center justify-center transition-all duration-300 bg-white ${getNodeColor("API")} ${activeStage === "API_SCAN" || activeStage === "BLOCKED" ? (packetState?.type === 'malicious' ? 'node-active-malicious scale-110' : 'node-active-safe scale-110') : ''}`}>
+                <div className={`w-32 h-32 rounded-2xl border-[3px] flex flex-col items-center justify-center transition-all duration-300 bg-white ${getNodeColor("API")} ${activeStage === "API_SCAN" || activeStage === "BLOCKED" ? (activeStage === 'BLOCKED' ? 'node-active-malicious scale-110' : 'node-active-safe scale-110') : ''}`}>
                   {activeStage === "BLOCKED" ? <AlertTriangle className="w-10 h-10 text-rose-500 mb-1" /> : <Shield className={`w-10 h-10 mb-1 ${activeStage === 'API_SCAN' ? 'text-emerald-500' : ''}`} />}
                   <span className="font-bold text-[11px] text-center leading-tight">API Security<br/>Engine</span>
                 </div>
