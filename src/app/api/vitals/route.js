@@ -99,15 +99,14 @@ export async function POST(request) {
 
       store.logs.unshift(logEntry);
       
-      // Attempt to save to Supabase, catching any errors to maintain local store availability
-      try {
-        const { error } = await supabase.from('logs').insert([logEntry]);
-        if (error) {
-          console.warn('Supabase insert error (saved to in-memory store only):', error);
-        }
-      } catch (dbError) {
-        console.warn('Supabase connection error (saved to in-memory store only):', dbError);
-      }
+      // Attempt to save to Supabase asynchronously to prevent hanging the API response
+      supabase.from('logs').insert([logEntry])
+        .then(({ error }) => {
+          if (error) console.warn('Supabase insert error:', error);
+        })
+        .catch(dbError => {
+          console.warn('Supabase connection error:', dbError);
+        });
 
       return NextResponse.json({
         status,

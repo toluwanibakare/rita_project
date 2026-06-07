@@ -13,12 +13,16 @@ export async function sendDeviceData(
   authToken = "Bearer iomt_secure_device_secret_token_1",
   timestamp = null
 ) {
-  const res = await fetch(`${API_BASE}/api/vitals`, {
-    method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "Authorization": authToken 
-    },
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/vitals`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": authToken 
+      },
     body: JSON.stringify({ 
       deviceId: deviceId, 
       heartRate: Number(heartRate),
@@ -26,8 +30,14 @@ export async function sendDeviceData(
       timestamp: timestamp || new Date().toISOString(),
       bypassSqliShield: bypassSqliShield
     }),
+    signal: controller.signal
   });
+  clearTimeout(timeoutId);
   return res.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 /**
