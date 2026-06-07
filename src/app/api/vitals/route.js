@@ -99,14 +99,18 @@ export async function POST(request) {
 
       store.logs.unshift(logEntry);
       
-      // Attempt to save to Supabase asynchronously to prevent hanging the API response
-      supabase.from('logs').insert([logEntry])
-        .then(({ error }) => {
-          if (error) console.warn('Supabase insert error:', error);
-        })
-        .catch(dbError => {
-          console.warn('Supabase connection error:', dbError);
-        });
+      // Attempt to save to Supabase with a 3-second timeout to prevent hanging while ensuring Next.js doesn't kill the async context
+      try {
+        const insertPromise = supabase.from('logs').insert([logEntry]);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase insert timeout')), 3000));
+        
+        const { error } = await Promise.race([insertPromise, timeoutPromise]);
+        if (error) {
+          console.warn('Supabase insert error (saved to in-memory store only):', error);
+        }
+      } catch (dbError) {
+        console.warn('Supabase connection or timeout error (saved to in-memory store only):', dbError);
+      }
 
       return NextResponse.json({
         status,
