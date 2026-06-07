@@ -125,6 +125,8 @@ export default function SimulatorPage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [activeLayerScan, setActiveLayerScan] = useState(null);
   const [activePresetId, setActivePresetId] = useState("normal");
+  const [customHR, setCustomHR] = useState(72);
+  const [customDevice, setCustomDevice] = useState("DEV-IOT-102");
 
   // Fetch logs
   useEffect(() => {
@@ -169,11 +171,14 @@ export default function SimulatorPage() {
     
     let result;
     try {
+      const hrToUse = preset.id === "custom" ? customHR : preset.config.heartRate;
+      const deviceToUse = preset.id === "custom" ? customDevice : preset.config.deviceId;
+
       if (preset.isDos) {
-        await sendDeviceData(preset.config.deviceId, preset.config.heartRate, preset.config.gatewayId, preset.config.bypassShield, preset.config.authToken, new Date().toISOString());
+        await sendDeviceData(deviceToUse, hrToUse, preset.config.gatewayId, preset.config.bypassShield, preset.config.authToken, new Date().toISOString());
       }
       const ts = preset.config.timeMode === "current" ? new Date().toISOString() : "2020-01-01T00:00:00.000Z";
-      result = await sendDeviceData(preset.config.deviceId, preset.config.heartRate, preset.config.gatewayId, preset.config.bypassShield, preset.config.authToken, ts);
+      result = await sendDeviceData(deviceToUse, hrToUse, preset.config.gatewayId, preset.config.bypassShield, preset.config.authToken, ts);
     } catch (e) {
       result = { status: "ERROR", reason: e.message };
     }
@@ -222,7 +227,12 @@ export default function SimulatorPage() {
   };
 
   const activeExplanation = EXPLANATIONS[activePresetId] || EXPLANATIONS.normal;
-  const activePresetConfig = PRESETS.find(p => p.id === activePresetId)?.config || PRESETS[0].config;
+  const activePresetConfig = PRESETS.find(p => p.id === activePresetId)?.config || {
+    deviceId: customDevice,
+    heartRate: customHR,
+    gatewayId: "GW-EDGE-01",
+    authToken: "Bearer iomt_secure_device_secret_token_1"
+  };
 
   // ─── Render Helpers (LIGHT THEME) ────────────────────────────────
   const getNodeColor = (nodeId) => {
@@ -275,7 +285,7 @@ export default function SimulatorPage() {
             <p className="text-slate-500 text-sm mb-4">
               Click a scenario below to visualize data flow, API inspection, and payload interception.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-4">
               {PRESETS.map((p) => (
                 <button
                   key={p.id}
@@ -292,6 +302,40 @@ export default function SimulatorPage() {
                   {p.label}
                 </button>
               ))}
+            </div>
+
+            {/* Custom Manual Input */}
+            <div className="flex flex-wrap items-end gap-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-bold text-slate-500 mb-1">Heart Rate Slider ({customHR} BPM)</label>
+                <input 
+                  type="range" min="0" max="250" value={customHR} 
+                  onChange={(e) => setCustomHR(Number(e.target.value))}
+                  className="w-full accent-indigo-500"
+                  disabled={isSimulating}
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-bold text-slate-500 mb-1">Device ID / Injection Payload</label>
+                <input 
+                  type="text" value={customDevice} 
+                  onChange={(e) => setCustomDevice(e.target.value)}
+                  className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                  disabled={isSimulating}
+                />
+              </div>
+              <button 
+                onClick={() => runSimulation({
+                  id: "custom",
+                  label: "Custom Manual Input",
+                  type: "suspicious",
+                  config: { timeMode: "current", bypassShield: false }
+                })}
+                disabled={isSimulating}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-sm text-sm disabled:opacity-50"
+              >
+                Send Custom Packet
+              </button>
             </div>
           </div>
 
