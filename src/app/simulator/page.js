@@ -127,6 +127,7 @@ export default function SimulatorPage() {
   const [activePresetId, setActivePresetId] = useState("normal");
   const [customHR, setCustomHR] = useState(72);
   const [customDevice, setCustomDevice] = useState("DEV-IOT-102");
+  const [bypassShield, setBypassShield] = useState(false);
 
   // Fetch logs
   useEffect(() => {
@@ -330,13 +331,23 @@ export default function SimulatorPage() {
                   className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
                   disabled={isSimulating}
                 />
+                <label className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-rose-600 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={bypassShield} 
+                    onChange={(e) => setBypassShield(e.target.checked)} 
+                    disabled={isSimulating}
+                    className="w-3.5 h-3.5 accent-rose-500"
+                  />
+                  BYPASS SQLi SHIELD (Simulate Exploit)
+                </label>
               </div>
               <button 
                 onClick={() => runSimulation({
                   id: "custom",
                   label: "Custom Manual Input",
                   type: "suspicious",
-                  config: { timeMode: "current", bypassShield: false }
+                  config: { timeMode: "current", bypassShield: bypassShield }
                 })}
                 disabled={isSimulating}
                 className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-sm text-sm disabled:opacity-50"
@@ -425,12 +436,19 @@ export default function SimulatorPage() {
 
               {/* Node 5: Database */}
               <div className="relative flex flex-col items-center">
-                <div className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center transition-all duration-300 bg-white ${getNodeColor("DB")} ${activeStage === "DB" ? "scale-110 shadow-[0_0_15px_rgba(16,185,129,0.3)] border-emerald-400 text-emerald-500" : ""}`}>
+                <div className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center transition-all duration-300 bg-white ${getNodeColor("DB")} ${activeStage === "DB" ? (bypassShield && packetState?.preset?.config?.bypassShield ? "scale-110 shadow-[0_0_25px_rgba(244,63,94,0.6)] border-rose-500 text-rose-500" : "scale-110 shadow-[0_0_15px_rgba(16,185,129,0.3)] border-emerald-400 text-emerald-500") : ""}`}>
                   <Database className="w-8 h-8" />
                 </div>
                 <span className="mt-2 font-semibold text-xs flex items-center gap-1 text-slate-700">
-                  <Lock className="w-3 h-3 text-emerald-500" /> Hospital DB
+                  {activeStage === "DB" && bypassShield && packetState?.preset?.config?.bypassShield ? <AlertTriangle className="w-3 h-3 text-rose-500" /> : <Lock className="w-3 h-3 text-emerald-500" />}
+                  Hospital DB
                 </span>
+                {activeStage === "DB" && bypassShield && packetState?.preset?.config?.bypassShield && (
+                  <div className="absolute -bottom-8 w-48 text-center text-[10px] font-bold text-rose-600 bg-rose-50 p-1 rounded border border-rose-200 animate-pulse">
+                    DATABASE COMPROMISED!
+                    <br/><span className="font-mono font-normal">Tables Dropped / Data Exfiltrated</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
